@@ -17,12 +17,16 @@ with full manifests.
 
 ## How it works
 
-1. **Query parsing** (`query_parser.py`) — an Anthropic API call (model
-   configurable via `.env`) turns your condition into a strict JSON structure:
-   `data_type`, `keywords`, `count`, `filters` (resolution, orientation,
-   date range, domain allowlist, language, watermark), `output_mode`, and a
-   `label` for the dataset folder name. If no `ANTHROPIC_API_KEY` is set, a
-   heuristic fallback parser handles basic cases so the app still runs.
+1. **Query parsing** (`query_parser.py`) — turns your condition into a strict
+   JSON structure: `data_type`, `keywords`, `count`, `filters` (resolution,
+   orientation, date range, domain allowlist, language, watermark),
+   `output_mode`, and a `label` for the dataset folder name. Tried in order:
+   an Anthropic tool-use call, then a Google Gemini structured-output call
+   (free tier, no credit card — see the key table below), then a heuristic
+   word-filter parser if neither LLM key is set. The heuristic parser handles
+   simple/common phrasings fine but can misfire on more conversational
+   sentences ("find me pictures that I can give my model to check if...") —
+   set either LLM key for reliably accurate parsing of arbitrary phrasing.
 2. **Source routing** (`source_router.py`) — tries configured API connectors
    for the data type first (in order), and falls back to the generic scraper
    (`scraper.py`) if none are configured or they return fewer results than
@@ -99,6 +103,7 @@ fallback, and a heuristic query parser instead of the LLM.
 | Service | Used for | Free tier | Get a key |
 |---|---|---|---|
 | Anthropic | parsing your condition into a structured query | pay-as-you-go, has a free credit for new accounts | https://console.anthropic.com/ |
+| Google Gemini | parsing your condition into a structured query (free alternative to Anthropic) | free tier, no credit card required | https://aistudio.google.com/apikey |
 | Unsplash | image search | 50 req/hour (demo apps) | https://unsplash.com/developers |
 | Pexels | image search | 200 req/hour | https://www.pexels.com/api/ |
 | Pixabay | image search | 5,000 req/hour | https://pixabay.com/api/docs/ |

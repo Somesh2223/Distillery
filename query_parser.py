@@ -1,11 +1,13 @@
 """Natural language -> StructuredQuery.
 
-Primary path: an Anthropic tool-use call that forces the model to emit a
-single tool call matching a strict JSON schema, so we never have to parse
-free-form text out of the response.
-
-Fallback path (no ANTHROPIC_API_KEY configured): a small heuristic parser so
-the app remains usable for demos/tests without an LLM key.
+Tried in order:
+1. Anthropic tool-use call that forces the model to emit a single tool call
+   matching a strict JSON schema, so we never parse free-form text.
+2. Google Gemini structured-output call (free tier via Google AI Studio) —
+   same idea, using Gemini's response_schema instead of a forced tool call.
+3. A small heuristic word-filter parser, so the app stays usable with no LLM
+   key configured at all — much less accurate on unusual phrasing than
+   either LLM option above.
 """
 from __future__ import annotations
 
@@ -13,7 +15,7 @@ import json
 import re
 from typing import Any
 
-from config import ANTHROPIC_API_KEY, ANTHROPIC_MODEL
+from config import ANTHROPIC_API_KEY, ANTHROPIC_MODEL, GEMINI_API_KEY, GEMINI_MODEL
 from logging_setup import get_logger, log_event
 from models import StructuredQuery
 
@@ -79,9 +81,14 @@ def parse_condition(condition: str) -> StructuredQuery:
         try:
             return _parse_with_llm(condition)
         except Exception as exc:
-            log_event(logger, "llm_parse_failed_falling_back", level=40, error=str(exc))
-    else:
-        log_event(logger, "no_anthropic_key_using_heuristic_parser", level=30)
+            log_event(logger, "anthropic_parse_failed_falling_back", level=40, error=str(exc))
+    if GEMINI_API_KEY:
+        try:
+            return _parse_with_gemini(condition)
+        except Exception as exc:
+            log_event(logger, "gemini_parse_failed_falling_back", level=40, error=str(exc))
+    if not ANTHROPIC_API_KEY and not GEMINI_API_KEY:
+        log_event(logger, "no_llm_key_using_heuristic_parser", level=30)
     return _heuristic_parse(condition)
 
 
@@ -103,6 +110,64 @@ def _parse_with_llm(condition: str) -> StructuredQuery:
     payload: dict[str, Any] = tool_use.input
     query = StructuredQuery.model_validate(payload)
     log_event(logger, "query_parsed_by_llm", condition=condition, structured_query=query.model_dump())
+    return query
+
+
+# Gemini's structured-output schema uses a different dialect than Anthropic's
+# JSON Schema (uppercase type names, "nullable" instead of a ["x", "null"]
+# type union), so it's expressed separately rather than reused.
+_GEMINI_RESPONSE_SCHEMA = {
+    "type": "OBJECT",
+    "properties": {
+        "data_type": {"type": "STRING", "enum": ["image", "text", "structured"]},
+        "keywords": {"type": "ARRAY", "items": {"type": "STRING"}},
+        "count": {"type": "INTEGER"},
+        "filters": {
+            "type": "OBJECT",
+            "properties": {
+                "resolution": {"type": "STRING", "enum": ["low", "medium", "high"], "nullable": True},
+                "orientation": {"type": "STRING", "enum": ["landscape", "portrait", "square"], "nullable": True},
+                "no_watermark": {"type": "BOOLEAN"},
+                "date_range": {
+                    "type": "OBJECT",
+                    "nullable": True,
+                    "properties": {
+                        "from": {"type": "STRING", "nullable": True},
+                        "to": {"type": "STRING", "nullable": True},
+                    },
+                },
+                "domain_allowlist": {"type": "ARRAY", "items": {"type": "STRING"}},
+                "language": {"type": "STRING", "nullable": True},
+            },
+            "required": ["no_watermark", "domain_allowlist"],
+        },
+        "output_mode": {"type": "STRING", "enum": ["preview", "dataset"]},
+        "label": {"type": "STRING"},
+        "notes": {"type": "STRING", "nullable": True},
+    },
+    "required": ["data_type", "keywords", "count", "filters", "output_mode", "label"],
+}
+
+
+def _parse_with_gemini(condition: str) -> StructuredQuery:
+    from google import genai
+    from google.genai import types
+
+    client = genai.Client(api_key=GEMINI_API_KEY)
+    response = client.models.generate_content(
+        model=GEMINI_MODEL,
+        contents=condition,
+        config=types.GenerateContentConfig(
+            system_instruction=_SYSTEM_PROMPT,
+            response_mime_type="application/json",
+            response_schema=_GEMINI_RESPONSE_SCHEMA,
+        ),
+    )
+    if not response.text:
+        raise ValueError("Gemini returned an empty response")
+    payload: dict[str, Any] = json.loads(response.text)
+    query = StructuredQuery.model_validate(payload)
+    log_event(logger, "query_parsed_by_gemini", condition=condition, structured_query=query.model_dump())
     return query
 
 
