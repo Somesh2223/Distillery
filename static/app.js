@@ -12,6 +12,7 @@
   $("parse-btn").addEventListener("click", onParse);
   $("fetch-btn").addEventListener("click", onFetch);
   $("export-btn").addEventListener("click", onExport);
+  $("stop-btn").addEventListener("click", onStop);
 
   function setMode(mode) {
     currentMode = mode;
@@ -21,7 +22,13 @@
 
   function showError(el, message) {
     el.textContent = message;
-    el.classList.remove("hidden");
+    el.classList.remove("hidden", "info");
+    el.classList.add("error");
+  }
+  function showInfo(el, message) {
+    el.textContent = message;
+    el.classList.remove("hidden", "error");
+    el.classList.add("info");
   }
   function hideError(el) {
     el.classList.add("hidden");
@@ -103,6 +110,10 @@
     $("results-panel").classList.add("hidden");
     $("results-grid").innerHTML = "";
     $("progress-label").textContent = "Starting...";
+    const stopBtn = $("stop-btn");
+    stopBtn.classList.remove("hidden");
+    stopBtn.disabled = false;
+    stopBtn.textContent = "Stop fetch";
     try {
       const resp = await fetch("/api/fetch", {
         method: "POST",
@@ -116,6 +127,22 @@
     } catch (err) {
       showError($("fetch-error"), "Failed to start fetch: " + err.message);
       $("fetch-btn").disabled = false;
+      stopBtn.classList.add("hidden");
+    }
+  }
+
+  async function onStop() {
+    if (!currentRunId) return;
+    const stopBtn = $("stop-btn");
+    stopBtn.disabled = true;
+    stopBtn.textContent = "Stopping...";
+    try {
+      const resp = await fetch(`/api/runs/${currentRunId}/cancel`, { method: "POST" });
+      if (!resp.ok) throw new Error(await resp.text());
+    } catch (err) {
+      stopBtn.disabled = false;
+      stopBtn.textContent = "Stop fetch";
+      showError($("fetch-error"), "Failed to stop fetch: " + err.message);
     }
   }
 
@@ -127,13 +154,17 @@
         if (!resp.ok) throw new Error(await resp.text());
         const run = await resp.json();
         renderProgress(run);
-        if (run.status === "completed" || run.status === "failed") {
+        if (run.status === "completed" || run.status === "failed" || run.status === "cancelled") {
           clearInterval(pollTimer);
           $("fetch-btn").disabled = false;
-          if (run.status === "completed") {
+          $("stop-btn").classList.add("hidden");
+          if (run.status === "failed") {
+            showError($("fetch-error"), "Fetch failed: " + (run.error || "unknown error"));
+          } else if (run.status === "cancelled") {
+            showInfo($("fetch-error"), `Stopped — ${run.fetched_count} item(s) fetched before you stopped it. Results below.`);
             await loadResults();
           } else {
-            showError($("fetch-error"), "Fetch failed: " + (run.error || "unknown error"));
+            await loadResults();
           }
         }
       } catch (err) {

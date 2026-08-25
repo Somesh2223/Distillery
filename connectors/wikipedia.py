@@ -9,7 +9,9 @@ All content is CC BY-SA 4.0 (https://en.wikipedia.org/wiki/Wikipedia:Copyrights)
 from __future__ import annotations
 
 import json
+import threading
 import time
+from typing import Optional
 
 import requests
 
@@ -47,11 +49,11 @@ class WikipediaConnector(BaseConnector):
     def is_configured(self) -> bool:
         return True
 
-    def fetch(self, query: StructuredQuery, count: int) -> list[Item]:
+    def fetch(self, query: StructuredQuery, count: int, cancel_event: Optional[threading.Event] = None) -> list[Item]:
         titles = _search_titles(query.search_terms(), count * 2)
         items: list[Item] = []
         for title in titles:
-            if len(items) >= count:
+            if len(items) >= count or (cancel_event is not None and cancel_event.is_set()):
                 break
             summary = self._get_extract(title)
             if not summary:
@@ -103,9 +105,11 @@ class WikipediaTableConnector(BaseConnector):
     def is_configured(self) -> bool:
         return True
 
-    def fetch(self, query: StructuredQuery, count: int) -> list[Item]:
+    def fetch(self, query: StructuredQuery, count: int, cancel_event: Optional[threading.Event] = None) -> list[Item]:
         titles = _search_titles(query.search_terms(), 5)
         for title in titles:
+            if cancel_event is not None and cancel_event.is_set():
+                break
             items = self._extract_table_rows(title, count, query.search_terms())
             if items:
                 log_event(logger, "wikipedia_table_fetch_complete", title=title, requested=count, fetched=len(items))

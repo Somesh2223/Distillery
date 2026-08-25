@@ -7,6 +7,7 @@ source_router.py can treat them interchangeably.
 from __future__ import annotations
 
 import hashlib
+import threading
 from dataclasses import dataclass, field
 from typing import Any, Optional
 
@@ -50,11 +51,15 @@ class BaseConnector:
         """Whether required API keys/env vars are present."""
         raise NotImplementedError
 
-    def fetch(self, query: StructuredQuery, count: int) -> list[Item]:
+    def fetch(self, query: StructuredQuery, count: int, cancel_event: Optional[threading.Event] = None) -> list[Item]:
         """Fetch up to `count` items matching the structured query.
 
         Implementations should never raise on ordinary API errors (rate
         limit, no results, etc) except to let the caller log and fall back;
         raising is reserved for programmer errors.
+
+        `cancel_event`, if given, should be checked between pages/requests
+        (not just at the top) so a user-triggered stop takes effect within
+        roughly one page-fetch, not only after `count` is fully satisfied.
         """
         raise NotImplementedError

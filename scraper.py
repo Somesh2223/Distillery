@@ -29,6 +29,7 @@ Safety/compliance for whatever URLs are found either way:
 """
 from __future__ import annotations
 
+import threading
 import time
 import urllib.robotparser
 from urllib.parse import urljoin, urlparse
@@ -176,7 +177,12 @@ def _extract_article_text(soup: BeautifulSoup) -> str:
     return " ".join(p.get_text(" ", strip=True) for p in paragraphs)
 
 
-def fallback_fetch(query: StructuredQuery, count: int, allowed_domains: list[str] | None = None) -> list[Item]:
+def fallback_fetch(
+    query: StructuredQuery,
+    count: int,
+    allowed_domains: list[str] | None = None,
+    cancel_event: threading.Event | None = None,
+) -> list[Item]:
     """Discover + scrape a fallback set of items when API connectors can't
     fully satisfy the request. Uses Google CSE (if configured) for web-wide
     discovery and/or a same-domain crawl of `domain_allowlist` (if given).
@@ -195,7 +201,7 @@ def fallback_fetch(query: StructuredQuery, count: int, allowed_domains: list[str
         search_urls = [u for u in search_urls if _domain(u).lower() in domain_filter or any(_domain(u).lower().endswith("." + d) for d in domain_filter)]
 
     for url in search_urls:
-        if len(items) >= count:
+        if len(items) >= count or (cancel_event is not None and cancel_event.is_set()):
             break
         domain = _domain(url)
 
@@ -247,9 +253,9 @@ def fallback_fetch(query: StructuredQuery, count: int, allowed_domains: list[str
 
     if len(items) < count and domain_filter:
         for domain in domain_filter:
-            if len(items) >= count:
+            if len(items) >= count or (cancel_event is not None and cancel_event.is_set()):
                 break
-            items.extend(_crawl_domain(domain, query, count - len(items), headers, pages_per_domain))
+            items.extend(_crawl_domain(domain, query, count - len(items), headers, pages_per_domain, cancel_event))
 
     if not search_urls and not domain_filter:
         log_event(
@@ -264,7 +270,14 @@ def fallback_fetch(query: StructuredQuery, count: int, allowed_domains: list[str
     return items[:count]
 
 
-def _crawl_domain(domain: str, query: StructuredQuery, remaining: int, headers: dict, pages_per_domain: dict[str, int]) -> list[Item]:
+def _crawl_domain(
+    domain: str,
+    query: StructuredQuery,
+    remaining: int,
+    headers: dict,
+    pages_per_domain: dict[str, int],
+    cancel_event: threading.Event | None = None,
+) -> list[Item]:
     """Same-domain BFS crawl starting at the homepage — used when the user
     explicitly allowlists a domain, independent of any search API."""
     items: list[Item] = []
@@ -273,6 +286,8 @@ def _crawl_domain(domain: str, query: StructuredQuery, remaining: int, headers: 
     terms = query.search_terms()
 
     while to_visit and len(items) < remaining and pages_per_domain.get(domain, 0) < SCRAPER_MAX_PAGES_PER_DOMAIN:
+        if cancel_event is not None and cancel_event.is_set():
+            break
         url = to_visit.pop(0)
         if url in visited:
             continue

@@ -129,6 +129,7 @@
   .hidden { display: none !important; }
   .actions { display: flex; gap: 10px; align-items: center; margin-top: 12px; }
   .error { color: var(--danger); font-size: 13px; margin-top: 8px; }
+  .info { color: var(--accent-2); font-size: 13px; margin-top: 8px; }
   .export-opts { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 12px; align-items: flex-end; }
   .export-opts .field { min-width: 90px; margin-bottom: 0; }
   footer { text-align: center; color: var(--muted); font-size: 12px; padding: 30px; }
@@ -236,6 +237,9 @@
       <span id="progress-count">0 / 0</span>
     </div>
     <div class="progress-wrap"><div class="progress-bar" id="progress-bar"></div></div>
+    <div class="actions">
+      <button class="secondary hidden" id="stop-btn">Stop fetch</button>
+    </div>
     <div id="fetch-error" class="error hidden"></div>
   </div>
 

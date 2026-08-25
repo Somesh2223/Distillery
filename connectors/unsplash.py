@@ -2,7 +2,9 @@
 (Demo apps get 50 requests/hour)."""
 from __future__ import annotations
 
+import threading
 import time
+from typing import Optional
 
 import requests
 
@@ -23,7 +25,7 @@ class UnsplashConnector(BaseConnector):
     def is_configured(self) -> bool:
         return bool(UNSPLASH_ACCESS_KEY)
 
-    def fetch(self, query: StructuredQuery, count: int) -> list[Item]:
+    def fetch(self, query: StructuredQuery, count: int, cancel_event: Optional[threading.Event] = None) -> list[Item]:
         items: list[Item] = []
         per_page = min(30, count)
         page = 1
@@ -36,6 +38,8 @@ class UnsplashConnector(BaseConnector):
             params["orientation"] = query.filters.orientation
 
         while len(items) < count:
+            if cancel_event is not None and cancel_event.is_set():
+                break
             params["page"] = page
             try:
                 resp = requests.get(API_URL, headers=headers, params=params, timeout=15)

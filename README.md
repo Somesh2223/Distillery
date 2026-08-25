@@ -131,6 +131,12 @@ fallback, and a heuristic query parser instead of the LLM.
   scraper, which domains were skipped for robots.txt) is logged as JSON lines
   to stdout.
 - **No hardcoded keys.** Everything comes from `.env` via `python-dotenv`.
+- **Cancellable fetches.** A "Stop fetch" button appears while a run is in
+  progress (`POST /api/runs/{run_id}/cancel`). Cancellation is checked
+  between pages/requests inside every connector and the scraper — not just
+  between whole connectors — so it takes effect within roughly one
+  page-fetch, and whatever was already fetched is kept and shown (run status
+  becomes `cancelled` rather than `completed`).
 
 ## Example queries
 

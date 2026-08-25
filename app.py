@@ -54,14 +54,19 @@ def parse_condition(req: ParseRequest):
     return query.model_dump(by_alias=True)
 
 
-def _run_fetch_job(run_id: str, query: StructuredQuery) -> None:
+_CANCEL_EVENTS: dict[str, threading.Event] = {}
+
+
+def _run_fetch_job(run_id: str, query: StructuredQuery, cancel_event: threading.Event) -> None:
     storage.update_run_status(run_id, "running")
     try:
-        source_router.route(query, run_id)
-        storage.update_run_status(run_id, "completed")
+        source_router.route(query, run_id, cancel_event=cancel_event)
+        storage.update_run_status(run_id, "cancelled" if cancel_event.is_set() else "completed")
     except Exception as exc:
         logger.exception("fetch job failed for run %s", run_id)
         storage.update_run_status(run_id, "failed", error=str(exc))
+    finally:
+        _CANCEL_EVENTS.pop(run_id, None)
 
 
 @app.post("/api/fetch")
@@ -74,9 +79,23 @@ def start_fetch(req: FetchRequest):
         req.structured_query.count,
         req.structured_query.output_mode,
     )
-    thread = threading.Thread(target=_run_fetch_job, args=(run_id, req.structured_query), daemon=True)
+    cancel_event = threading.Event()
+    _CANCEL_EVENTS[run_id] = cancel_event
+    thread = threading.Thread(target=_run_fetch_job, args=(run_id, req.structured_query, cancel_event), daemon=True)
     thread.start()
     return {"run_id": run_id}
+
+
+@app.post("/api/runs/{run_id}/cancel")
+def cancel_run(run_id: str):
+    run = storage.get_run(run_id)
+    if not run:
+        raise HTTPException(404, "run not found")
+    cancel_event = _CANCEL_EVENTS.get(run_id)
+    if cancel_event is None:
+        raise HTTPException(409, f"run is already '{run['status']}' — nothing to stop")
+    cancel_event.set()
+    return {"status": "cancelling"}
 
 
 @app.get("/api/runs/{run_id}/status")
