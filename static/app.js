@@ -156,6 +156,9 @@
     const data = await resp.json();
     $("results-panel").classList.remove("hidden");
     $("results-summary").textContent = `${data.total} item(s) fetched`;
+    if (data.total === 0 && data.zero_result_hint) {
+      showError($("fetch-error"), data.zero_result_hint);
+    }
     const grid = $("results-grid");
     grid.innerHTML = "";
     for (const item of data.items) {
