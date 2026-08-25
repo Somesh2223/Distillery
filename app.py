@@ -21,7 +21,7 @@ import dataset_export
 import query_parser
 import source_router
 import storage
-from config import BASE_DIR, FETCHED_DIR
+from config import BASE_DIR, FETCHED_DIR, GOOGLE_CSE_API_KEY, GOOGLE_CSE_CX
 from logging_setup import configure_logging, get_logger
 from models import ExportOptions, StructuredQuery
 
@@ -87,6 +87,31 @@ def run_status(run_id: str):
     return run
 
 
+_DATA_TYPE_KEY_HINTS = {
+    "image": "UNSPLASH_ACCESS_KEY, PEXELS_API_KEY, or PIXABAY_API_KEY",
+    "text": "NEWSAPI_KEY or REDDIT_CLIENT_ID/REDDIT_CLIENT_SECRET (Wikipedia/Hacker News need no key but may not cover your topic)",
+    "structured": "no key needed for Wikipedia tables — try rephrasing to match a specific Wikipedia list article",
+}
+
+
+def _zero_result_hint(data_type: str) -> str:
+    configured = [c.name for c in source_router.CONNECTORS_BY_TYPE.get(data_type, []) if c.is_configured()]
+    key_hint = _DATA_TYPE_KEY_HINTS.get(data_type, "an API key for this data type")
+    if configured:
+        return (
+            f"No results came back from {', '.join(configured)} or the scraper fallback for this query. "
+            "Try broader/fewer keywords, or add filters.domain_allowlist so the scraper can crawl a specific site."
+        )
+    search_configured = bool(GOOGLE_CSE_API_KEY and GOOGLE_CSE_CX)
+    if search_configured:
+        return f"No {data_type} API connector is configured ({key_hint}), and the scraper fallback found no matches either."
+    return (
+        f"No {data_type} API connector is configured ({key_hint}), and the scraper fallback has no way to discover "
+        "URLs across the web without GOOGLE_CSE_API_KEY + GOOGLE_CSE_CX (or a filters.domain_allowlist to crawl a "
+        "specific site directly). See README.md for free-tier key sources — this is why you're seeing 0 results."
+    )
+
+
 @app.get("/api/runs/{run_id}/results")
 def run_results(run_id: str, offset: int = 0, limit: int = 60):
     run = storage.get_run(run_id)
@@ -94,7 +119,11 @@ def run_results(run_id: str, offset: int = 0, limit: int = 60):
         raise HTTPException(404, "run not found")
     items = storage.list_items_for_run(run_id, offset, limit)
     total = storage.count_items_for_run(run_id)
-    return {"items": items, "total": total, "run": run}
+    hint = None
+    if total == 0 and run["status"] == "completed":
+        structured = json.loads(run["structured_query"])
+        hint = _zero_result_hint(structured.get("data_type", "text"))
+    return {"items": items, "total": total, "run": run, "zero_result_hint": hint}
 
 
 @app.get("/api/files/{item_id}")
