@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DataFetcher</title>
+<style>
+  :root {
+    --bg: #0f1216;
+    --panel: #171b21;
+    --panel-2: #1e232b;
+    --border: #2a303a;
+    --text: #e6e9ef;
+    --muted: #8a93a3;
+    --accent: #4f8cff;
+    --accent-2: #33d69f;
+    --danger: #ff5d5d;
+    --radius: 10px;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+  }
+  header {
+    padding: 20px 28px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+  }
+  header h1 { font-size: 20px; margin: 0; }
+  header span { color: var(--muted); font-size: 13px; }
+  main {
+    max-width: 980px;
+    margin: 0 auto;
+    padding: 28px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+  }
+  textarea, input[type=text], input[type=number], select {
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-size: 14px;
+    width: 100%;
+  }
+  textarea { min-height: 70px; resize: vertical; font-family: inherit; }
+  label { font-size: 12px; color: var(--muted); display: block; margin-bottom: 4px; }
+  .field { margin-bottom: 14px; }
+  .row { display: flex; gap: 14px; flex-wrap: wrap; }
+  .row > .field { flex: 1; min-width: 160px; }
+  .mode-toggle { display: flex; gap: 8px; margin-bottom: 14px; }
+  .mode-toggle button {
+    flex: 1;
+    padding: 10px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--panel-2);
+    color: var(--muted);
+    cursor: pointer;
+    font-size: 13px;
+  }
+  .mode-toggle button.active { border-color: var(--accent); color: var(--text); background: #1a2436; }
+  button.primary {
+    background: var(--accent);
+    color: white;
+    border: none;
+    padding: 11px 18px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 600;
+  }
+  button.primary:disabled { opacity: 0.5; cursor: not-allowed; }
+  button.secondary {
+    background: transparent;
+    color: var(--text);
+    border: 1px solid var(--border);
+    padding: 10px 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 13px;
+  }
+  .checkbox-row { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; }
+  .checkbox-row input { width: auto; }
+  details.filters { margin-top: 4px; }
+  details.filters summary { cursor: pointer; color: var(--accent); font-size: 13px; margin-bottom: 10px; }
+  .progress-wrap { background: var(--panel-2); border-radius: 6px; overflow: hidden; height: 10px; margin: 12px 0; }
+  .progress-bar { background: linear-gradient(90deg, var(--accent), var(--accent-2)); height: 100%; width: 0%; transition: width .3s; }
+  .status-line { font-size: 13px; color: var(--muted); display: flex; justify-content: space-between; }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 12px;
+    margin-top: 14px;
+  }
+  .card {
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    font-size: 12px;
+  }
+  .card img { width: 100%; height: 120px; object-fit: cover; display: block; background: #000; }
+  .card .body { padding: 8px; }
+  .card .title { font-weight: 600; margin-bottom: 4px; max-height: 32px; overflow: hidden; }
+  .card .meta { color: var(--muted); font-size: 11px; }
+  .badge {
+    display: inline-block;
+    font-size: 10px;
+    background: #223046;
+    color: var(--accent);
+    padding: 2px 6px;
+    border-radius: 4px;
+    margin-right: 4px;
+  }
+  .hidden { display: none !important; }
+  .actions { display: flex; gap: 10px; align-items: center; margin-top: 12px; }
+  .error { color: var(--danger); font-size: 13px; margin-top: 8px; }
+  .export-opts { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 12px; align-items: flex-end; }
+  .export-opts .field { min-width: 90px; margin-bottom: 0; }
+  footer { text-align: center; color: var(--muted); font-size: 12px; padding: 30px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>DataFetcher</h1>
+  <span>fetch web data by natural-language condition, optionally package it as an ML dataset</span>
+</header>
+<main>
+
+  <div class="panel">
+    <div class="field">
+      <label for="condition">Condition</label>
+      <textarea id="condition" placeholder="e.g. 50 high-resolution photos of red sports cars from the side, no watermarks"></textarea>
+    </div>
+    <div class="mode-toggle">
+      <button id="mode-preview" class="active" data-mode="preview">Quick preview</button>
+      <button id="mode-dataset" data-mode="dataset">Build dataset</button>
+    </div>
+    <div class="actions">
+      <button class="primary" id="parse-btn">Parse condition</button>
+      <span id="parse-status" class="status-line"></span>
+    </div>
+    <div id="parse-error" class="error hidden"></div>
+  </div>
+
+  <div class="panel hidden" id="filters-panel">
+    <div class="row">
+      <div class="field">
+        <label for="f-data-type">Data type</label>
+        <select id="f-data-type">
+          <option value="image">image</option>
+          <option value="text">text</option>
+          <option value="structured">structured</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="f-count">Count</label>
+        <input type="number" id="f-count" min="1" max="1000">
+      </div>
+      <div class="field">
+        <label for="f-label">Dataset label</label>
+        <input type="text" id="f-label">
+      </div>
+    </div>
+    <div class="field">
+      <label for="f-keywords">Keywords (comma separated)</label>
+      <input type="text" id="f-keywords">
+    </div>
+    <details class="filters">
+      <summary>Advanced filters (power users)</summary>
+      <div class="row">
+        <div class="field">
+          <label for="f-resolution">Resolution</label>
+          <select id="f-resolution">
+            <option value="">any</option>
+            <option value="low">low</option>
+            <option value="medium">medium</option>
+            <option value="high">high</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="f-orientation">Orientation</label>
+          <select id="f-orientation">
+            <option value="">any</option>
+            <option value="landscape">landscape</option>
+            <option value="portrait">portrait</option>
+            <option value="square">square</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="f-language">Language</label>
+          <input type="text" id="f-language" placeholder="en">
+        </div>
+      </div>
+      <div class="row">
+        <div class="field">
+          <label for="f-date-from">Date from</label>
+          <input type="text" id="f-date-from" placeholder="YYYY-MM-DD">
+        </div>
+        <div class="field">
+          <label for="f-date-to">Date to</label>
+          <input type="text" id="f-date-to" placeholder="YYYY-MM-DD">
+        </div>
+      </div>
+      <div class="field">
+        <label for="f-domains">Domain allowlist (comma separated, narrows scraper fallback only)</label>
+        <input type="text" id="f-domains" placeholder="example.com, another.org">
+      </div>
+      <div class="checkbox-row">
+        <input type="checkbox" id="f-no-watermark">
+        <label for="f-no-watermark" style="margin:0;">No watermarks</label>
+      </div>
+    </details>
+    <div class="actions">
+      <button class="primary" id="fetch-btn">Start fetch</button>
+    </div>
+  </div>
+
+  <div class="panel hidden" id="progress-panel">
+    <div class="status-line">
+      <span id="progress-label">Fetching...</span>
+      <span id="progress-count">0 / 0</span>
+    </div>
+    <div class="progress-wrap"><div class="progress-bar" id="progress-bar"></div></div>
+    <div id="fetch-error" class="error hidden"></div>
+  </div>
+
+  <div class="panel hidden" id="results-panel">
+    <div class="status-line">
+      <span id="results-summary"></span>
+    </div>
+    <div class="grid" id="results-grid"></div>
+
+    <div id="export-section" class="hidden">
+      <hr style="border-color: var(--border); margin: 16px 0;">
+      <div class="export-opts">
+        <div class="field"><label>Train %</label><input type="number" id="split-train" value="80"></div>
+        <div class="field"><label>Val %</label><input type="number" id="split-val" value="10"></div>
+        <div class="field"><label>Test %</label><input type="number" id="split-test" value="10"></div>
+        <div class="field"><label>Resize W (images)</label><input type="number" id="resize-w" placeholder="e.g. 256"></div>
+        <div class="field"><label>Resize H (images)</label><input type="number" id="resize-h" placeholder="e.g. 256"></div>
+        <button class="primary" id="export-btn">Download dataset (.zip)</button>
+      </div>
+      <div id="export-status" class="status-line" style="margin-top:8px;"></div>
+    </div>
+  </div>
+
+</main>
+<footer>Local tool — respects robots.txt and each API's rate limits. Check per-item license/attribution before training use.</footer>
+<script src="/app.js"></script>
+</body>
+</html>
