@@ -114,6 +114,26 @@ _DATASET_WORDS = {"dataset", "training", "train", "ml", "model", "labeled", "lab
 _STOPWORDS = {
     "a", "an", "the", "of", "for", "from", "with", "no", "and", "or", "to", "in", "on",
     "high-resolution", "high", "resolution", "short", "recent", "latest",
+    # conversational/request scaffolding — describes the ASK, not the SUBJECT, and
+    # left unfiltered these can crowd out the actual descriptive keywords entirely
+    # (e.g. "find pictures that i can give to my model to check if X" would keep
+    # "find/that/i/can/give/my" instead of "X").
+    "find", "finding", "give", "giving", "check", "checking", "get", "getting",
+    "need", "needing", "needed", "want", "wanting", "looking", "look", "show",
+    "showing", "provide", "providing", "fetch", "fetching", "help", "please",
+    "can", "could", "would", "should", "will", "shall", "must", "may", "might",
+    "is", "are", "was", "were", "be", "been", "being", "do", "does", "did",
+    "that", "this", "these", "those", "which", "who", "whom", "whose", "what",
+    "i", "im", "you", "your", "yours", "my", "mine", "me", "us", "we", "our",
+    "it", "its", "not", "if", "whether", "so", "then", "just", "some", "any",
+    "each", "every", "using", "used", "use", "about", "by", "few", "several",
+    "many", "most", "more", "less", "without", "watermark", "watermarks",
+}
+# Category-indicator words are useful for detecting data_type/output_mode but
+# don't describe the subject — stripped from the keywords sent to connectors
+# so e.g. "model" (as in "my ML model") doesn't get searched for literally.
+_NON_DESCRIPTIVE_WORDS = _IMAGE_WORDS | _TEXT_WORDS | _DATASET_WORDS | {
+    w for w in _STRUCTURED_WORDS if " " not in w
 }
 
 
@@ -132,10 +152,15 @@ def _heuristic_parse(condition: str) -> StructuredQuery:
     count = int(count_match.group(1)) if count_match else 20
     count = max(1, min(count, 1000))
 
-    words = [w.strip(",.") for w in lower.split()]
-    keywords = [w for w in words if w not in _STOPWORDS and not w.isdigit()]
-    # collapse to a short phrase rather than a long stopword-stripped bag
-    keywords = keywords[:8] if keywords else [condition.strip()]
+    words = [w.strip(",.?!") for w in lower.split()]
+    keywords = [
+        w for w in words
+        if w and w not in _STOPWORDS and w not in _NON_DESCRIPTIVE_WORDS and not w.isdigit() and not w.isnumeric()
+    ]
+    # A generous cap, not a truncation to the first few words — after the
+    # filler-word filtering above, what's left is almost always the actual
+    # subject, so we shouldn't cut it off arbitrarily.
+    keywords = keywords[:15] if keywords else [condition.strip()]
 
     no_watermark = "no watermark" in lower or "without watermark" in lower
     orientation = None
