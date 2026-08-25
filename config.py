@@ -18,8 +18,14 @@ for d in (DATA_DIR, FETCHED_DIR, DATASETS_DIR):
     d.mkdir(parents=True, exist_ok=True)
 
 # --- LLM (query parsing) ---
+# Tried in this order: Anthropic, then Gemini, then a heuristic word-filter
+# fallback. Both LLM options are optional and independent — set whichever
+# you have a key for.
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
 ANTHROPIC_MODEL = os.getenv("ANTHROPIC_MODEL", "claude-sonnet-5")
+
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
 
 # --- Image API connectors ---
 UNSPLASH_ACCESS_KEY = os.getenv("UNSPLASH_ACCESS_KEY", "")
