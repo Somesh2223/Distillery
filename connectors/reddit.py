@@ -3,7 +3,9 @@ needed for read-only search). Create a "script" app at
 https://www.reddit.com/prefs/apps to get a free client id/secret."""
 from __future__ import annotations
 
+import threading
 import time
+from typing import Optional
 
 import requests
 
@@ -50,7 +52,7 @@ class RedditConnector(BaseConnector):
         _token_cache["expires_at"] = time.time() + data.get("expires_in", 3600) - 30
         return token
 
-    def fetch(self, query: StructuredQuery, count: int) -> list[Item]:
+    def fetch(self, query: StructuredQuery, count: int, cancel_event: Optional[threading.Event] = None) -> list[Item]:
         token = self._get_token()
         if not token:
             return []
@@ -58,6 +60,8 @@ class RedditConnector(BaseConnector):
         headers = {"Authorization": f"bearer {token}", "User-Agent": REDDIT_USER_AGENT}
         after = None
         while len(items) < count:
+            if cancel_event is not None and cancel_event.is_set():
+                break
             params = {
                 "q": query.search_terms(),
                 "limit": min(100, count),

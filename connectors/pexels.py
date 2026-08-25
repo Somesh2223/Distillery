@@ -1,7 +1,9 @@
 """Pexels API connector (images). Free tier: https://www.pexels.com/api/ (200 req/hour)."""
 from __future__ import annotations
 
+import threading
 import time
+from typing import Optional
 
 import requests
 
@@ -22,7 +24,7 @@ class PexelsConnector(BaseConnector):
     def is_configured(self) -> bool:
         return bool(PEXELS_API_KEY)
 
-    def fetch(self, query: StructuredQuery, count: int) -> list[Item]:
+    def fetch(self, query: StructuredQuery, count: int, cancel_event: Optional[threading.Event] = None) -> list[Item]:
         items: list[Item] = []
         per_page = min(80, count)
         page = 1
@@ -32,6 +34,8 @@ class PexelsConnector(BaseConnector):
             params["orientation"] = query.filters.orientation
 
         while len(items) < count:
+            if cancel_event is not None and cancel_event.is_set():
+                break
             params["page"] = page
             try:
                 resp = requests.get(API_URL, headers=headers, params=params, timeout=15)

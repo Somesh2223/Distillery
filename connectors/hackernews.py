@@ -2,6 +2,9 @@
 https://hn.algolia.com/api"""
 from __future__ import annotations
 
+import threading
+from typing import Optional
+
 import requests
 
 from connectors.base import BaseConnector, Item, make_id
@@ -20,11 +23,13 @@ class HackerNewsConnector(BaseConnector):
     def is_configured(self) -> bool:
         return True  # no key required
 
-    def fetch(self, query: StructuredQuery, count: int) -> list[Item]:
+    def fetch(self, query: StructuredQuery, count: int, cancel_event: Optional[threading.Event] = None) -> list[Item]:
         items: list[Item] = []
         page = 0
         hits_per_page = min(100, count)
         while len(items) < count:
+            if cancel_event is not None and cancel_event.is_set():
+                break
             params = {
                 "query": query.search_terms(),
                 "tags": "story",

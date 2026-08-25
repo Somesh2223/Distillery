@@ -2,7 +2,9 @@
 (100 requests/day, articles capped at ~1 month old on the free tier)."""
 from __future__ import annotations
 
+import threading
 import time
+from typing import Optional
 
 import requests
 
@@ -23,7 +25,7 @@ class NewsApiConnector(BaseConnector):
     def is_configured(self) -> bool:
         return bool(NEWSAPI_KEY)
 
-    def fetch(self, query: StructuredQuery, count: int) -> list[Item]:
+    def fetch(self, query: StructuredQuery, count: int, cancel_event: Optional[threading.Event] = None) -> list[Item]:
         items: list[Item] = []
         page_size = min(100, count)
         page = 1
@@ -45,6 +47,8 @@ class NewsApiConnector(BaseConnector):
             params["domains"] = ",".join(query.filters.domain_allowlist)
 
         while len(items) < count:
+            if cancel_event is not None and cancel_event.is_set():
+                break
             params["page"] = page
             try:
                 resp = requests.get(API_URL, params=params, timeout=15)

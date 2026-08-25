@@ -1,7 +1,9 @@
 """Pixabay API connector (images). Free tier: https://pixabay.com/api/docs/ (5000 req/hour)."""
 from __future__ import annotations
 
+import threading
 import time
+from typing import Optional
 
 import requests
 
@@ -22,7 +24,7 @@ class PixabayConnector(BaseConnector):
     def is_configured(self) -> bool:
         return bool(PIXABAY_API_KEY)
 
-    def fetch(self, query: StructuredQuery, count: int) -> list[Item]:
+    def fetch(self, query: StructuredQuery, count: int, cancel_event: Optional[threading.Event] = None) -> list[Item]:
         items: list[Item] = []
         per_page = min(200, max(3, count))
         page = 1
@@ -38,6 +40,8 @@ class PixabayConnector(BaseConnector):
             params["min_width"] = 1920
 
         while len(items) < count:
+            if cancel_event is not None and cancel_event.is_set():
+                break
             params["page"] = page
             try:
                 resp = requests.get(API_URL, params=params, timeout=15)

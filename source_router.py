@@ -6,6 +6,7 @@ the raw content, run dedup, and persist metadata to SQLite.
 """
 from __future__ import annotations
 
+import threading
 import time
 from pathlib import Path
 from typing import Callable, Optional
@@ -38,19 +39,35 @@ CONNECTORS_BY_TYPE: dict[str, list] = {
 ProgressCallback = Callable[[int, int], None]  # (fetched_count, requested_count)
 
 
-def route(query: StructuredQuery, run_id: str, progress_cb: Optional[ProgressCallback] = None) -> list[Item]:
+def route(
+    query: StructuredQuery,
+    run_id: str,
+    progress_cb: Optional[ProgressCallback] = None,
+    cancel_event: Optional[threading.Event] = None,
+) -> list[Item]:
     materialized: list[Item] = []
     existing_phashes = [p for _id, p in storage.get_existing_phashes()]
     existing_text_sigs = [dedup.decode_signature(h) for _id, h in storage.get_existing_text_hashes()]
+
+    def _cancelled() -> bool:
+        return cancel_event is not None and cancel_event.is_set()
 
     def _notify() -> None:
         storage.set_run_fetched_count(run_id, len(materialized))
         if progress_cb:
             progress_cb(len(materialized), query.count)
 
+    def _consume(raw_items: list[Item]) -> None:
+        for item in raw_items:
+            if _cancelled() or len(materialized) >= query.count:
+                break
+            if _materialize_and_dedup(item, run_id, existing_phashes, existing_text_sigs):
+                materialized.append(item)
+                _notify()
+
     connectors = CONNECTORS_BY_TYPE.get(query.data_type, [])
     for connector in connectors:
-        if len(materialized) >= query.count:
+        if len(materialized) >= query.count or _cancelled():
             break
         if not connector.is_configured():
             log_event(logger, "connector_skipped_not_configured", connector=connector.name)
@@ -59,16 +76,15 @@ def route(query: StructuredQuery, run_id: str, progress_cb: Optional[ProgressCal
         log_event(logger, "connector_selected", connector=connector.name, data_type=query.data_type, requested=remaining,
                    reason="configured connector matches data_type, trying before scraper fallback")
         try:
-            raw_items = connector.fetch(query, remaining)
+            raw_items = connector.fetch(query, remaining, cancel_event=cancel_event)
         except Exception as exc:
             log_event(logger, "connector_fetch_error", level=40, connector=connector.name, error=str(exc))
             continue
-        for item in raw_items:
-            if len(materialized) >= query.count:
-                break
-            if _materialize_and_dedup(item, run_id, existing_phashes, existing_text_sigs):
-                materialized.append(item)
-                _notify()
+        _consume(raw_items)
+
+    if _cancelled():
+        log_event(logger, "route_cancelled", run_id=run_id, fetched=len(materialized))
+        return materialized
 
     if len(materialized) < query.count:
         remaining = query.count - len(materialized)
@@ -80,18 +96,16 @@ def route(query: StructuredQuery, run_id: str, progress_cb: Optional[ProgressCal
             reason="no configured connector satisfied the full request for this data_type",
         )
         try:
-            raw_items = fallback_fetch(query, remaining)
+            raw_items = fallback_fetch(query, remaining, cancel_event=cancel_event)
         except Exception as exc:
             log_event(logger, "scraper_fallback_error", level=40, error=str(exc))
             raw_items = []
-        for item in raw_items:
-            if len(materialized) >= query.count:
-                break
-            if _materialize_and_dedup(item, run_id, existing_phashes, existing_text_sigs):
-                materialized.append(item)
-                _notify()
+        _consume(raw_items)
 
-    log_event(logger, "route_complete", run_id=run_id, requested=query.count, fetched=len(materialized))
+    if _cancelled():
+        log_event(logger, "route_cancelled", run_id=run_id, fetched=len(materialized))
+    else:
+        log_event(logger, "route_complete", run_id=run_id, requested=query.count, fetched=len(materialized))
     return materialized
 
 
