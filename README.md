@@ -120,6 +120,19 @@ fallback, and a heuristic query parser instead of the LLM.
 
 ## Non-functional behavior
 
+- **Concurrent fetching.** Downloading/deduping/saving each item is the
+  dominant cost of a run, so it happens across a small thread pool
+  (`MATERIALIZE_WORKERS` in `.env`, default 8) instead of one item at a
+  time — roughly a 4-5x speedup in practice. Dedup state is kept consistent
+  across threads with a lock around the check-and-reserve step.
+- **Manual curation before export.** The results grid lets you click any
+  card to discard it (dimmed, marked "discarded") — discarded items are
+  excluded from the dataset export/zip but stay in the preview so you can
+  toggle them back. This exists because no amount of keyword tuning fully
+  guarantees visual relevance from a stock-photo API (e.g. "slippery
+  surface" pulls in warning-sign photos no matter how the query is phrased,
+  since that's how the library itself tags the concept) — manual review is
+  the only fully reliable filter.
 - **robots.txt is always respected.** The scraper checks `robots.txt` for
   every domain it visits before fetching anything and logs the decision
   (`storage.scrape_log`). A domain's `robots.txt` disallowing a path means

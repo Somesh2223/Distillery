@@ -11,6 +11,8 @@ import shutil
 import zipfile
 from pathlib import Path
 
+from typing import Optional
+
 from config import DATASETS_DIR, FETCHED_DIR
 from logging_setup import get_logger, log_event
 from models import ExportOptions
@@ -19,10 +21,16 @@ import storage
 logger = get_logger(__name__)
 
 
-def export_dataset(run_id: str, label: str, data_type: str, options: ExportOptions) -> Path:
+def export_dataset(
+    run_id: str, label: str, data_type: str, options: ExportOptions, exclude_ids: Optional[set[str]] = None
+) -> Path:
     items = storage.list_items_for_run(run_id, offset=0, limit=1_000_000)
+    if exclude_ids:
+        before = len(items)
+        items = [it for it in items if it["id"] not in exclude_ids]
+        log_event(logger, "export_items_excluded", run_id=run_id, excluded=before - len(items), kept=len(items))
     if not items:
-        raise ValueError("no items to export for this run")
+        raise ValueError("no items to export for this run (all items were excluded)" if exclude_ids else "no items to export for this run")
 
     rng = random.Random(options.seed)
     shuffled = items[:]

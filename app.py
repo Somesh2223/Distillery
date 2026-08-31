@@ -44,6 +44,7 @@ class ExportRequest(BaseModel):
     split: Optional[dict] = None
     resize: Optional[list[int]] = None
     seed: int = 42
+    exclude_ids: Optional[list[str]] = None
 
 
 @app.post("/api/parse")
@@ -170,9 +171,11 @@ def export_run(run_id: str, req: ExportRequest):
         kwargs["resize"] = tuple(req.resize)
     options = ExportOptions(**kwargs)
 
+    exclude_ids = set(req.exclude_ids) if req.exclude_ids else None
     try:
         zip_path = dataset_export.export_dataset(
-            run_id, structured.get("label", "dataset"), structured.get("data_type", "text"), options
+            run_id, structured.get("label", "dataset"), structured.get("data_type", "text"), options,
+            exclude_ids=exclude_ids,
         )
     except ValueError as exc:
         raise HTTPException(400, str(exc))

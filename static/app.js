@@ -6,6 +6,7 @@
   let currentMode = "preview";
   let currentRunId = null;
   let pollTimer = null;
+  let excludedIds = new Set();
 
   $("mode-preview").addEventListener("click", () => setMode("preview"));
   $("mode-dataset").addEventListener("click", () => setMode("dataset"));
@@ -185,8 +186,9 @@
     const resp = await fetch(`/api/runs/${currentRunId}/results?limit=200`);
     if (!resp.ok) return;
     const data = await resp.json();
+    excludedIds = new Set(); // fresh run — nothing discarded yet
     $("results-panel").classList.remove("hidden");
-    $("results-summary").textContent = `${data.total} item(s) fetched`;
+    updateResultsSummary(data.total);
     if (data.total === 0 && data.zero_result_hint) {
       showError($("fetch-error"), data.zero_result_hint);
     }
@@ -202,9 +204,24 @@
     }
   }
 
+  function updateResultsSummary(total) {
+    const kept = total - excludedIds.size;
+    $("results-summary").textContent = excludedIds.size > 0
+      ? `${kept} of ${total} item(s) kept for export (${excludedIds.size} discarded — click a card to toggle)`
+      : `${total} item(s) fetched — click a card to discard ones you don't want`;
+  }
+
   function renderCard(item) {
     const card = document.createElement("div");
     card.className = "card";
+    card.dataset.itemId = item.id;
+    card.title = "Click to discard/keep this item";
+
+    const discardBadge = document.createElement("div");
+    discardBadge.className = "discard-badge";
+    discardBadge.textContent = "discarded";
+    card.appendChild(discardBadge);
+
     if (item.data_type === "image" && item.local_path) {
       const img = document.createElement("img");
       img.src = `/api/files/${item.id}`;
@@ -228,6 +245,19 @@
     meta.innerHTML = `<span class="badge">${item.source_name || ""}</span>${item.license || "license unknown"}`;
     body.appendChild(meta);
     card.appendChild(body);
+
+    card.addEventListener("click", () => {
+      const id = card.dataset.itemId;
+      if (excludedIds.has(id)) {
+        excludedIds.delete(id);
+        card.classList.remove("discarded");
+      } else {
+        excludedIds.add(id);
+        card.classList.add("discarded");
+      }
+      updateResultsSummary($("results-grid").children.length);
+    });
+
     return card;
   }
 
@@ -242,6 +272,7 @@
       seed: 42,
     };
     if (resizeW && resizeH) body.resize = [resizeW, resizeH];
+    if (excludedIds.size > 0) body.exclude_ids = Array.from(excludedIds);
 
     $("export-btn").disabled = true;
     $("export-status").textContent = "Building dataset...";

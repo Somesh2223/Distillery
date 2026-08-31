@@ -54,6 +54,12 @@ SCRAPER_MIN_DELAY_SECONDS = float(os.getenv("SCRAPER_MIN_DELAY_SECONDS", "1.0"))
 SCRAPER_RENDER_JS = os.getenv("SCRAPER_RENDER_JS", "false").lower() == "true"
 SCRAPER_MAX_RETRIES = int(os.getenv("SCRAPER_MAX_RETRIES", "3"))
 
+# --- Performance ---
+# How many items to download/materialize concurrently per fetch. Network
+# downloads are the dominant cost, so this is the main speed lever — raise it
+# if you have bandwidth to spare, lower it if a connector starts rate-limiting.
+MATERIALIZE_WORKERS = int(os.getenv("MATERIALIZE_WORKERS", "8"))
+
 # --- Dedup thresholds ---
 IMAGE_PHASH_HAMMING_THRESHOLD = int(os.getenv("IMAGE_PHASH_HAMMING_THRESHOLD", "6"))
 TEXT_JACCARD_THRESHOLD = float(os.getenv("TEXT_JACCARD_THRESHOLD", "0.8"))
