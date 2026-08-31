@@ -29,7 +29,7 @@ from models import ExportOptions, StructuredQuery
 configure_logging()
 logger = get_logger("app")
 
-app = FastAPI(title="DataFetcher", description="Fetch and package web data into ML-ready datasets.")
+app = FastAPI(title="Distillery", description="Distill web data into labeled, ML-ready datasets from a plain-English condition.")
 
 
 class ParseRequest(BaseModel):
