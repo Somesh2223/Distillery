@@ -54,7 +54,22 @@ def route(
     run_id: str,
     progress_cb: Optional[ProgressCallback] = None,
     cancel_event: Optional[threading.Event] = None,
+    existing_count: int = 0,
+    target_new: Optional[int] = None,
 ) -> list[Item]:
+    """`existing_count` + `target_new` are for /topup calls: the run already
+    has `existing_count` items, and we want `target_new` *new* ones on top.
+    `query.count` then means "how large a candidate pool to ask connectors
+    for" (bigger than target_new) rather than the stop threshold — asking a
+    connector for exactly `target_new` items would just re-return the same
+    top-ranked results as last time (deterministic ranking for the same
+    query), which are already-known duplicates and dedup away to nothing.
+    Requesting a larger pool lets dedup skip the ones already seen and
+    surface enough new ones beyond that. For a normal (non-topup) fetch,
+    target_new is None and this all reduces to the original behavior:
+    target == query.count, existing_count == 0.
+    """
+    target = query.count if target_new is None else target_new
     materialized: list[Item] = []
     existing_phashes = [p for _id, p in storage.get_existing_phashes()]
     existing_text_sigs = [dedup.decode_signature(h) for _id, h in storage.get_existing_text_hashes()]
@@ -63,9 +78,10 @@ def route(
         return cancel_event is not None and cancel_event.is_set()
 
     def _notify() -> None:
-        storage.set_run_fetched_count(run_id, len(materialized))
+        total_so_far = existing_count + len(materialized)
+        storage.set_run_fetched_count(run_id, total_so_far)
         if progress_cb:
-            progress_cb(len(materialized), query.count)
+            progress_cb(total_so_far, existing_count + target)
 
     state_lock = threading.Lock()
 
@@ -81,11 +97,11 @@ def route(
             if _cancelled():
                 return
             with state_lock:
-                if len(materialized) >= query.count:
+                if len(materialized) >= target:
                     return
             if _materialize_and_dedup(item, run_id, existing_phashes, existing_text_sigs, state_lock):
                 with state_lock:
-                    if len(materialized) < query.count:
+                    if len(materialized) < target:
                         materialized.append(item)
                         _notify()
 
@@ -96,7 +112,7 @@ def route(
 
     connectors = CONNECTORS_BY_TYPE.get(query.data_type, [])
     for connector in connectors:
-        if len(materialized) >= query.count or _cancelled():
+        if len(materialized) >= target or _cancelled():
             break
         if not connector.is_configured():
             log_event(logger, "connector_skipped_not_configured", connector=connector.name)
@@ -115,7 +131,7 @@ def route(
         log_event(logger, "route_cancelled", run_id=run_id, fetched=len(materialized))
         return materialized
 
-    if len(materialized) < query.count:
+    if len(materialized) < target:
         remaining = query.count - len(materialized)
         log_event(
             logger,
@@ -134,7 +150,7 @@ def route(
     if _cancelled():
         log_event(logger, "route_cancelled", run_id=run_id, fetched=len(materialized))
     else:
-        log_event(logger, "route_complete", run_id=run_id, requested=query.count, fetched=len(materialized))
+        log_event(logger, "route_complete", run_id=run_id, requested=target, fetched=len(materialized))
     return materialized
 
 
