@@ -33,8 +33,16 @@ CREATE TABLE IF NOT EXISTS runs (
     updated_at TEXT NOT NULL
 );
 
+-- `id` (a hash of the source URL) is scoped to (run_id, id), NOT globally
+-- unique on its own — a globally-unique id meant that once a URL was
+-- fetched in ANY run, it could never be fetched again in any FUTURE run
+-- either, even a totally unrelated one. Since APIs like Pexels return the
+-- same top-ranked URLs for the same/similar search every time, that made a
+-- repeated or refined query silently return far fewer results each time,
+-- with no indication why. Cross-run dedup is now an explicit opt-in
+-- (StructuredQuery.filters.dedupe_across_runs) handled in source_router.py.
 CREATE TABLE IF NOT EXISTS items (
-    id TEXT PRIMARY KEY,
+    id TEXT NOT NULL,
     run_id TEXT NOT NULL,
     data_type TEXT NOT NULL,
     source_name TEXT,
@@ -53,6 +61,7 @@ CREATE TABLE IF NOT EXISTS items (
     query_text TEXT,
     fetched_at TEXT,
     extra_json TEXT,
+    PRIMARY KEY (run_id, id),
     FOREIGN KEY (run_id) REFERENCES runs(id)
 );
 
@@ -71,6 +80,48 @@ CREATE TABLE IF NOT EXISTS scrape_log (
 """
 
 
+def _migrate_items_pk_if_needed(conn: sqlite3.Connection) -> None:
+    """Upgrades a pre-existing `items` table from the old `id TEXT PRIMARY
+    KEY` (globally unique) to `PRIMARY KEY (run_id, id)` (unique per run),
+    preserving every row. `CREATE TABLE IF NOT EXISTS` in SCHEMA is a no-op
+    against an already-existing `items` table regardless of its old shape,
+    so this runs separately to actually fix it in place."""
+    cur = conn.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='items'")
+    row = cur.fetchone()
+    if row is None or "PRIMARY KEY (run_id, id)" in row[0]:
+        return  # fresh DB (SCHEMA above already created the new shape) or already migrated
+    conn.executescript(
+        """
+        ALTER TABLE items RENAME TO items_pk_migration;
+        CREATE TABLE items (
+            id TEXT NOT NULL,
+            run_id TEXT NOT NULL,
+            data_type TEXT NOT NULL,
+            source_name TEXT,
+            source_url TEXT,
+            local_path TEXT,
+            title TEXT,
+            text_snippet TEXT,
+            width INTEGER,
+            height INTEGER,
+            phash TEXT,
+            text_hash TEXT,
+            license TEXT,
+            attribution TEXT,
+            author TEXT,
+            published_at TEXT,
+            query_text TEXT,
+            fetched_at TEXT,
+            extra_json TEXT,
+            PRIMARY KEY (run_id, id),
+            FOREIGN KEY (run_id) REFERENCES runs(id)
+        );
+        INSERT INTO items SELECT * FROM items_pk_migration;
+        DROP TABLE items_pk_migration;
+        """
+    )
+
+
 def get_conn() -> sqlite3.Connection:
     global _CONN
     if _CONN is None:
@@ -78,6 +129,7 @@ def get_conn() -> sqlite3.Connection:
         _CONN.row_factory = sqlite3.Row
         with _LOCK:
             _CONN.executescript(SCHEMA)
+            _migrate_items_pk_if_needed(_CONN)
             _CONN.commit()
     return _CONN
 
@@ -156,9 +208,14 @@ def get_run(run_id: str) -> Optional[dict]:
 # --- items ---
 
 def insert_item(run_id: str, item: Item) -> bool:
-    """Returns False if the item id already exists globally (skip as duplicate)."""
+    """Returns False if this exact item id already exists within this same
+    run (a defensive check against double-inserting one item; shouldn't
+    normally trigger). Dedup ACROSS runs is a separate, opt-in decision made
+    by the caller — see source_router.route()'s `dedupe_across_runs` handling,
+    which controls whether existing_phashes/existing_text_sigs start
+    pre-loaded with everything ever fetched or start empty."""
     with cursor() as cur:
-        cur.execute("SELECT 1 FROM items WHERE id = ?", (item.id,))
+        cur.execute("SELECT 1 FROM items WHERE id = ? AND run_id = ?", (item.id, run_id))
         if cur.fetchone():
             return False
         cur.execute(

@@ -27,6 +27,14 @@ class QueryFilters(BaseModel):
     date_range: Optional[DateRange] = None
     domain_allowlist: list[str] = Field(default_factory=list)
     language: Optional[str] = None
+    # Off by default: each run gets a fair, independent shot at the full
+    # result pool, unaffected by anything fetched in earlier runs. Turning
+    # this on skips anything ever fetched before (any run, any query) too —
+    # useful for deliberately building one non-repeating library over time,
+    # but means a repeated/refined query can return far fewer results, since
+    # APIs like Pexels return the same top-ranked items for a similar search
+    # every time.
+    dedupe_across_runs: bool = False
 
 
 class StructuredQuery(BaseModel):
