@@ -9,7 +9,7 @@ from typing import Optional
 import requests
 
 from config import NEWSAPI_KEY
-from connectors.base import BaseConnector, Item, make_id
+from connectors.base import BaseConnector, Item, make_id, raise_for_connector_failure
 from logging_setup import get_logger, log_event
 from models import StructuredQuery
 
@@ -29,6 +29,7 @@ class NewsApiConnector(BaseConnector):
         items: list[Item] = []
         page_size = min(100, count)
         page = 1
+        rate_limit_retries = 0
         params: dict = {
             "q": query.search_terms(),
             "pageSize": page_size,
@@ -54,13 +55,20 @@ class NewsApiConnector(BaseConnector):
                 resp = requests.get(API_URL, params=params, timeout=15)
             except requests.RequestException as exc:
                 log_event(logger, "newsapi_request_failed", level=40, error=str(exc))
+                if not items:
+                    raise_for_connector_failure("NewsAPI", exc=exc)
                 break
             if resp.status_code == 429:
                 log_event(logger, "newsapi_rate_limited", level=30)
+                rate_limit_retries += 1
+                if not items and rate_limit_retries >= 5:
+                    raise_for_connector_failure("NewsAPI", status_code=429)
                 time.sleep(2)
                 continue
             if resp.status_code != 200:
                 log_event(logger, "newsapi_bad_status", level=40, status=resp.status_code, body=resp.text[:300])
+                if not items:
+                    raise_for_connector_failure("NewsAPI", status_code=resp.status_code)
                 break
             data = resp.json()
             articles = data.get("articles", [])

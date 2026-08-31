@@ -15,7 +15,7 @@ from typing import Optional
 
 import requests
 
-from connectors.base import BaseConnector, Item, make_id
+from connectors.base import BaseConnector, Item, make_id, raise_for_connector_failure
 from logging_setup import get_logger, log_event
 from models import StructuredQuery
 
@@ -26,6 +26,9 @@ LICENSE = "CC BY-SA 4.0 (Wikipedia)"
 
 
 def _search_titles(term: str, limit: int) -> list[str]:
+    """Always the first network call for both connectors below (before either
+    has any items), so a failure here means the whole fetch will yield
+    nothing — worth raising a specific reason rather than returning []."""
     params = {
         "action": "query",
         "list": "search",
@@ -38,6 +41,7 @@ def _search_titles(term: str, limit: int) -> list[str]:
         resp.raise_for_status()
     except requests.RequestException as exc:
         log_event(logger, "wikipedia_search_failed", level=40, error=str(exc))
+        raise_for_connector_failure("Wikipedia", exc=exc)
         return []
     return [r["title"] for r in resp.json().get("query", {}).get("search", [])]
 

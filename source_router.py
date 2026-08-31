@@ -18,7 +18,7 @@ from requests.adapters import HTTPAdapter
 import dedup
 import storage
 from config import FETCHED_DIR, MATERIALIZE_WORKERS
-from connectors.base import Item
+from connectors.base import CATEGORY_PRIORITY, ConnectorUnavailableError, Item
 from connectors.hackernews import HackerNewsConnector
 from connectors.newsapi import NewsApiConnector
 from connectors.pexels import PexelsConnector
@@ -71,6 +71,7 @@ def route(
     """
     target = query.count if target_new is None else target_new
     materialized: list[Item] = []
+    connector_errors: list[ConnectorUnavailableError] = []
     existing_phashes = [p for _id, p in storage.get_existing_phashes()]
     existing_text_sigs = [dedup.decode_signature(h) for _id, h in storage.get_existing_text_hashes()]
 
@@ -122,6 +123,10 @@ def route(
                    reason="configured connector matches data_type, trying before scraper fallback")
         try:
             raw_items = _fetch_with_keyword_fallback(connector.fetch, query, remaining, cancel_event, connector.name)
+        except ConnectorUnavailableError as exc:
+            log_event(logger, "connector_unavailable", level=40, connector=connector.name, category=exc.category, error=str(exc))
+            connector_errors.append(exc)
+            continue
         except Exception as exc:
             log_event(logger, "connector_fetch_error", level=40, connector=connector.name, error=str(exc))
             continue
@@ -142,6 +147,10 @@ def route(
         )
         try:
             raw_items = _fetch_with_keyword_fallback(fallback_fetch, query, remaining, cancel_event, "scraper")
+        except ConnectorUnavailableError as exc:
+            log_event(logger, "connector_unavailable", level=40, connector="scraper", category=exc.category, error=str(exc))
+            connector_errors.append(exc)
+            raw_items = []
         except Exception as exc:
             log_event(logger, "scraper_fallback_error", level=40, error=str(exc))
             raw_items = []
@@ -149,8 +158,19 @@ def route(
 
     if _cancelled():
         log_event(logger, "route_cancelled", run_id=run_id, fetched=len(materialized))
-    else:
-        log_event(logger, "route_complete", run_id=run_id, requested=target, fetched=len(materialized))
+        return materialized
+
+    if not materialized and connector_errors:
+        # Every source we tried hit a real infrastructure problem (dead
+        # network, bad key, exhausted quota) rather than genuinely finding
+        # no matches — surface the single most useful one instead of a
+        # generic "no results" message.
+        connector_errors.sort(key=lambda e: CATEGORY_PRIORITY.get(e.category, 9))
+        log_event(logger, "route_failed_all_sources_unavailable", run_id=run_id,
+                   categories=[e.category for e in connector_errors])
+        raise connector_errors[0]
+
+    log_event(logger, "route_complete", run_id=run_id, requested=target, fetched=len(materialized))
     return materialized
 
 

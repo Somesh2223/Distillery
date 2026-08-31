@@ -22,6 +22,7 @@ import query_parser
 import source_router
 import storage
 from config import BASE_DIR, FETCHED_DIR, GOOGLE_CSE_API_KEY, GOOGLE_CSE_CX
+from connectors.base import ConnectorUnavailableError
 from logging_setup import configure_logging, get_logger
 from models import ExportOptions, StructuredQuery
 
@@ -69,6 +70,11 @@ def _run_fetch_job(
     try:
         source_router.route(query, run_id, cancel_event=cancel_event, existing_count=existing_count, target_new=target_new)
         storage.update_run_status(run_id, "cancelled" if cancel_event.is_set() else "completed")
+    except ConnectorUnavailableError as exc:
+        # An expected, already-classified failure (no internet, bad API key,
+        # rate limit, upstream outage) — log it plainly, not as a crash.
+        logger.warning("fetch job for run %s failed: [%s] %s", run_id, exc.category, exc)
+        storage.update_run_status(run_id, "failed", error=str(exc))
     except Exception as exc:
         logger.exception("fetch job failed for run %s", run_id)
         storage.update_run_status(run_id, "failed", error=str(exc))

@@ -151,6 +151,18 @@ fallback, and a heuristic query parser instead of the LLM.
 - **Single-item download.** Each card in the results grid has a small ⬇
   button (top-left) to save just that one item, independent of the
   "Download dataset (.zip)" bulk export.
+- **Specific failure messages, not a generic "no results."** A connector or
+  the scraper that can't reach its API at all — no internet, an invalid/
+  expired API key (HTTP 401/403), a persistent rate limit (429), or the
+  API's own servers being down (5xx) — raises a `ConnectorUnavailableError`
+  with that specific category instead of silently returning nothing. If
+  every source hits a real problem like this (as opposed to genuinely
+  finding zero matches), the run is marked `failed` with that exact reason
+  (e.g. "Could not reach Pexels — check your internet connection." or
+  "Pexels rejected the request (HTTP 401) — check that its API key in .env
+  is correct, active, and not expired.") rather than the generic "no
+  results came back" hint, which is reserved for when sources are reachable
+  and simply have no matching content.
 - **robots.txt is always respected.** The scraper checks `robots.txt` for
   every domain it visits before fetching anything and logs the decision
   (`storage.scrape_log`). A domain's `robots.txt` disallowing a path means

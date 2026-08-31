@@ -10,7 +10,7 @@ from typing import Optional
 import requests
 
 from config import REDDIT_CLIENT_ID, REDDIT_CLIENT_SECRET, REDDIT_USER_AGENT
-from connectors.base import BaseConnector, Item, make_id
+from connectors.base import BaseConnector, Item, make_id, raise_for_connector_failure
 from logging_setup import get_logger, log_event
 from models import StructuredQuery
 
@@ -42,9 +42,12 @@ class RedditConnector(BaseConnector):
             )
         except requests.RequestException as exc:
             log_event(logger, "reddit_token_request_failed", level=40, error=str(exc))
+            raise_for_connector_failure("Reddit", exc=exc)
             return None
         if resp.status_code != 200:
             log_event(logger, "reddit_token_bad_status", level=40, status=resp.status_code)
+            # Reddit returns 401 for a bad client id/secret pair here.
+            raise_for_connector_failure("Reddit", status_code=resp.status_code)
             return None
         data = resp.json()
         token = data.get("access_token")
@@ -57,6 +60,7 @@ class RedditConnector(BaseConnector):
         if not token:
             return []
         items: list[Item] = []
+        rate_limit_retries = 0
         headers = {"Authorization": f"bearer {token}", "User-Agent": REDDIT_USER_AGENT}
         after = None
         while len(items) < count:
@@ -74,13 +78,20 @@ class RedditConnector(BaseConnector):
                 resp = requests.get(SEARCH_URL, headers=headers, params=params, timeout=15)
             except requests.RequestException as exc:
                 log_event(logger, "reddit_search_failed", level=40, error=str(exc))
+                if not items:
+                    raise_for_connector_failure("Reddit", exc=exc)
                 break
             if resp.status_code == 429:
                 log_event(logger, "reddit_rate_limited", level=30)
+                rate_limit_retries += 1
+                if not items and rate_limit_retries >= 5:
+                    raise_for_connector_failure("Reddit", status_code=429)
                 time.sleep(2)
                 continue
             if resp.status_code != 200:
                 log_event(logger, "reddit_bad_status", level=40, status=resp.status_code)
+                if not items:
+                    raise_for_connector_failure("Reddit", status_code=resp.status_code)
                 break
             data = resp.json().get("data", {})
             children = data.get("children", [])

@@ -46,7 +46,7 @@ from config import (
     SCRAPER_RENDER_JS,
     SCRAPER_USER_AGENT,
 )
-from connectors.base import Item, make_id
+from connectors.base import Item, make_id, raise_for_connector_failure
 from logging_setup import get_logger, log_event
 from models import StructuredQuery
 import storage
@@ -151,12 +151,16 @@ def _google_cse_urls(term: str, limit: int, image: bool) -> list[str]:
             resp = requests.get(GOOGLE_CSE_URL, params=params, timeout=15)
         except requests.RequestException as exc:
             log_event(logger, "google_cse_request_failed", level=40, error=str(exc))
+            if not urls:
+                raise_for_connector_failure("Google Custom Search", exc=exc)
             break
         if resp.status_code == 429:
             time.sleep(2)
             continue
         if resp.status_code != 200:
             log_event(logger, "google_cse_bad_status", level=40, status=resp.status_code, body=resp.text[:300])
+            if not urls:
+                raise_for_connector_failure("Google Custom Search", status_code=resp.status_code)
             break
         entries = resp.json().get("items", [])
         if not entries:
