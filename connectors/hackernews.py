@@ -7,7 +7,7 @@ from typing import Optional
 
 import requests
 
-from connectors.base import BaseConnector, Item, make_id
+from connectors.base import BaseConnector, Item, make_id, raise_for_connector_failure
 from logging_setup import get_logger, log_event
 from models import StructuredQuery
 
@@ -48,9 +48,13 @@ class HackerNewsConnector(BaseConnector):
                 resp = requests.get(API_URL, params=params, timeout=15)
             except requests.RequestException as exc:
                 log_event(logger, "hackernews_request_failed", level=40, error=str(exc))
+                if not items:
+                    raise_for_connector_failure("Hacker News", exc=exc)
                 break
             if resp.status_code != 200:
                 log_event(logger, "hackernews_bad_status", level=40, status=resp.status_code)
+                if not items:
+                    raise_for_connector_failure("Hacker News", status_code=resp.status_code)
                 break
             data = resp.json()
             hits = data.get("hits", [])
