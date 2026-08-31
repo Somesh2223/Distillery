@@ -242,6 +242,14 @@
     }
   }
 
+  function fileUrl(itemId) {
+    // run_id disambiguates which row/file to serve — the same source URL
+    // fetched in two different runs shares an id (dedup is per-run by
+    // default now), so without this the server could serve an unrelated
+    // run's file, including one that's since been cleaned up.
+    return `/api/files/${itemId}?run_id=${encodeURIComponent(currentRunId)}`;
+  }
+
   function setCardDiscarded(card, btn, discarded) {
     card.classList.toggle("discarded", discarded);
     btn.textContent = discarded ? "↺ Restore" : "✕ Discard";
@@ -257,7 +265,7 @@
       const filename = item.local_path.split("/").pop() || `${item.id}.dat`;
       const downloadLink = document.createElement("a");
       downloadLink.className = "download-btn";
-      downloadLink.href = `/api/files/${item.id}`;
+      downloadLink.href = fileUrl(item.id);
       downloadLink.download = filename;
       downloadLink.title = "Download this item";
       downloadLink.textContent = "⬇";
@@ -286,7 +294,7 @@
 
     if (item.data_type === "image" && item.local_path) {
       const img = document.createElement("img");
-      img.src = `/api/files/${item.id}`;
+      img.src = fileUrl(item.id);
       img.loading = "lazy";
       card.appendChild(img);
     }
