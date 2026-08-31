@@ -266,6 +266,10 @@
         <input type="checkbox" id="f-no-watermark">
         <label for="f-no-watermark" style="margin:0;">No watermarks</label>
       </div>
+      <div class="checkbox-row">
+        <input type="checkbox" id="f-dedupe-across-runs">
+        <label for="f-dedupe-across-runs" style="margin:0;">Skip anything I've ever fetched before, in any run (off by default — a repeated/refined query can otherwise return far fewer results, since sources return the same top matches each time)</label>
+      </div>
     </details>
     <div class="actions">
       <button class="primary" id="fetch-btn">Start fetch</button>

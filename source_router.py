@@ -72,8 +72,15 @@ def route(
     target = query.count if target_new is None else target_new
     materialized: list[Item] = []
     connector_errors: list[ConnectorUnavailableError] = []
-    existing_phashes = [p for _id, p in storage.get_existing_phashes()]
-    existing_text_sigs = [dedup.decode_signature(h) for _id, h in storage.get_existing_text_hashes()]
+    # Per-run dedup is the default (each run stands alone, unaffected by
+    # earlier ones) — see QueryFilters.dedupe_across_runs. Cross-run dedup is
+    # opt-in: only then do we pre-load everything ever fetched before.
+    if query.filters.dedupe_across_runs:
+        existing_phashes = [p for _id, p in storage.get_existing_phashes()]
+        existing_text_sigs = [dedup.decode_signature(h) for _id, h in storage.get_existing_text_hashes()]
+    else:
+        existing_phashes = []
+        existing_text_sigs = []
 
     def _cancelled() -> bool:
         return cancel_event is not None and cancel_event.is_set()

@@ -124,6 +124,19 @@ fallback, and a heuristic query parser instead of the LLM.
 
 ## Non-functional behavior
 
+- **Dedup is per-run by default, not global.** Earlier versions keyed every
+  fetched item's database row on a hash of its source URL *globally* — once
+  a URL was fetched in any run, it could never be fetched again in any
+  future run either, even a completely unrelated one. Since APIs like
+  Pexels return the same top-ranked URLs for the same/similar search every
+  time, that made a repeated or refined query silently return far fewer
+  results each time, with no indication why (e.g. 21/21 the first time,
+  then 0, then 5, then 8 on the same query run repeatedly). Each run now
+  gets an independent, fair shot at the full result pool by default.
+  Turning on "Skip anything I've ever fetched before, in any run" in
+  Advanced filters (`filters.dedupe_across_runs`) restores the old global
+  behavior, for when you deliberately want one non-repeating library built
+  up over many runs instead of independent per-query results.
 - **Concurrent fetching.** Downloading/deduping/saving each item is the
   dominant cost of a run, so it happens across a small thread pool
   (`MATERIALIZE_WORKERS` in `.env`, default 8) instead of one item at a

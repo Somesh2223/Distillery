@@ -81,6 +81,7 @@
     $("f-orientation").value = filters.orientation || "";
     $("f-language").value = filters.language || "";
     $("f-no-watermark").checked = !!filters.no_watermark;
+    $("f-dedupe-across-runs").checked = !!filters.dedupe_across_runs;
     $("f-domains").value = (filters.domain_allowlist || []).join(", ");
     const dr = filters.date_range || {};
     $("f-date-from").value = dr.from || "";
@@ -103,6 +104,7 @@
         resolution: $("f-resolution").value || null,
         orientation: $("f-orientation").value || null,
         no_watermark: $("f-no-watermark").checked,
+        dedupe_across_runs: $("f-dedupe-across-runs").checked,
         language: $("f-language").value.trim() || null,
         domain_allowlist: domains,
         date_range: (dateFrom || dateTo) ? { from: dateFrom || null, to: dateTo || null } : null,
