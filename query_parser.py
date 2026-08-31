@@ -72,7 +72,13 @@ _SYSTEM_PROMPT = (
     "tool. Infer sensible defaults when the user doesn't specify something explicitly: default count "
     "is 20 if not stated (cap at 1000), default output_mode is 'preview' unless the user clearly wants "
     "a training/testing dataset (mentions of 'dataset', 'training', 'ML', 'labeled', 'train/test split' "
-    "imply output_mode='dataset'). Always call the emit_structured_query tool exactly once."
+    "imply output_mode='dataset'). For data_type='image', phrase each keyword as a literal, concrete "
+    "visual scene or texture the camera would actually see (e.g. 'icy sidewalk', 'wet tile floor close up', "
+    "'rain-soaked pavement') rather than the abstract concept itself (e.g. avoid bare words like 'slippery' "
+    "or 'danger') — stock photo libraries tag abstract hazard concepts overwhelmingly with warning-sign and "
+    "caution-icon photos, not photos of the actual surface/condition, so concrete scene descriptions match "
+    "real, relevant photos far more often. Only include sign/warning/icon imagery in the keywords if the "
+    "user explicitly asked for that. Always call the emit_structured_query tool exactly once."
 )
 
 
