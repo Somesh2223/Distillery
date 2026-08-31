@@ -222,6 +222,18 @@
     discardBadge.textContent = "discarded";
     card.appendChild(discardBadge);
 
+    if (item.local_path) {
+      const filename = item.local_path.split("/").pop() || `${item.id}.dat`;
+      const downloadLink = document.createElement("a");
+      downloadLink.className = "download-btn";
+      downloadLink.href = `/api/files/${item.id}`;
+      downloadLink.download = filename;
+      downloadLink.title = "Download this item";
+      downloadLink.textContent = "⬇";
+      downloadLink.addEventListener("click", (e) => e.stopPropagation()); // don't also toggle discard
+      card.appendChild(downloadLink);
+    }
+
     if (item.data_type === "image" && item.local_path) {
       const img = document.createElement("img");
       img.src = `/api/files/${item.id}`;
