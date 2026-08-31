@@ -133,6 +133,9 @@ fallback, and a heuristic query parser instead of the LLM.
   surface" pulls in warning-sign photos no matter how the query is phrased,
   since that's how the library itself tags the concept) — manual review is
   the only fully reliable filter.
+- **Single-item download.** Each card in the results grid has a small ⬇
+  button (top-left) to save just that one item, independent of the
+  "Download dataset (.zip)" bulk export.
 - **robots.txt is always respected.** The scraper checks `robots.txt` for
   every domain it visits before fetching anything and logs the decision
   (`storage.scrape_log`). A domain's `robots.txt` disallowing a path means
