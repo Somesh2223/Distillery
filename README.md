@@ -36,7 +36,12 @@ with full manifests.
    deliberately does not scrape a search engine's results page directly,
    since engines like Google/DuckDuckGo actively fingerprint and block that
    kind of automated access, and defeating it would mean bypassing bot
-   detection.
+   detection. Every connector/scraper call joins `keywords` into one search
+   string first; if an LLM parser returned several alternative phrasings
+   (e.g. `["slippery surface", "wet floor", "ice"]`) rather than modifying
+   words meant to combine, that joined string can be too narrow to match
+   anything — so a connector/scraper call that comes up short is retried
+   with each keyword phrase individually before moving on.
 3. **Dedup** (`dedup.py`) — perceptual hashing (`imagehash`) for images,
    shingle/MinHash similarity for text — checked against both the current
    batch and everything previously indexed in SQLite.

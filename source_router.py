@@ -76,7 +76,7 @@ def route(
         log_event(logger, "connector_selected", connector=connector.name, data_type=query.data_type, requested=remaining,
                    reason="configured connector matches data_type, trying before scraper fallback")
         try:
-            raw_items = connector.fetch(query, remaining, cancel_event=cancel_event)
+            raw_items = _fetch_with_keyword_fallback(connector.fetch, query, remaining, cancel_event, connector.name)
         except Exception as exc:
             log_event(logger, "connector_fetch_error", level=40, connector=connector.name, error=str(exc))
             continue
@@ -96,7 +96,7 @@ def route(
             reason="no configured connector satisfied the full request for this data_type",
         )
         try:
-            raw_items = fallback_fetch(query, remaining, cancel_event=cancel_event)
+            raw_items = _fetch_with_keyword_fallback(fallback_fetch, query, remaining, cancel_event, "scraper")
         except Exception as exc:
             log_event(logger, "scraper_fallback_error", level=40, error=str(exc))
             raw_items = []
@@ -107,6 +107,48 @@ def route(
     else:
         log_event(logger, "route_complete", run_id=run_id, requested=query.count, fetched=len(materialized))
     return materialized
+
+
+def _fetch_with_keyword_fallback(
+    fetch_fn: Callable[..., list[Item]],
+    query: StructuredQuery,
+    count: int,
+    cancel_event: Optional[threading.Event],
+    source_name: str,
+) -> list[Item]:
+    """Calls `fetch_fn(query, count, cancel_event=...)` — a connector's fetch
+    or the scraper's fallback_fetch — with the query as given (all keywords
+    joined into one search string). If that comes up short and there's more
+    than one keyword, retries with each keyword phrase individually.
+
+    This matters because an LLM parser often returns several alternative
+    phrasings in `keywords` (e.g. ["slippery surface", "wet floor", "ice"])
+    rather than modifying words meant to combine into one phrase — joining
+    all of them into a single search string can be too narrow/contradictory
+    for a connector's search index to match anything.
+    """
+    items = fetch_fn(query, count, cancel_event=cancel_event)
+    if len(items) >= count or len(query.keywords) <= 1:
+        return items
+    if cancel_event is not None and cancel_event.is_set():
+        return items
+
+    log_event(logger, "retrying_with_individual_keywords", source=source_name, keywords=query.keywords)
+    seen_ids = {it.id for it in items}
+    for kw in query.keywords:
+        if len(items) >= count or (cancel_event is not None and cancel_event.is_set()):
+            break
+        narrowed = query.model_copy(update={"keywords": [kw]})
+        try:
+            sub_items = fetch_fn(narrowed, count - len(items), cancel_event=cancel_event)
+        except Exception as exc:
+            log_event(logger, "keyword_retry_fetch_error", level=40, source=source_name, keyword=kw, error=str(exc))
+            continue
+        for it in sub_items:
+            if it.id not in seen_ids:
+                seen_ids.add(it.id)
+                items.append(it)
+    return items
 
 
 def _guess_extension(url: str, content_type: str) -> str:

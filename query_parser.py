@@ -77,19 +77,23 @@ _SYSTEM_PROMPT = (
 
 
 def parse_condition(condition: str) -> StructuredQuery:
+    fallback_reason: str | None = None
     if ANTHROPIC_API_KEY:
         try:
             return _parse_with_llm(condition)
         except Exception as exc:
             log_event(logger, "anthropic_parse_failed_falling_back", level=40, error=str(exc))
+            fallback_reason = f"Anthropic call failed ({exc}); "
     if GEMINI_API_KEY:
         try:
             return _parse_with_gemini(condition)
         except Exception as exc:
             log_event(logger, "gemini_parse_failed_falling_back", level=40, error=str(exc))
+            fallback_reason = (fallback_reason or "") + f"Gemini call failed ({exc}); "
     if not ANTHROPIC_API_KEY and not GEMINI_API_KEY:
         log_event(logger, "no_llm_key_using_heuristic_parser", level=30)
-    return _heuristic_parse(condition)
+        fallback_reason = "no ANTHROPIC_API_KEY or GEMINI_API_KEY configured; "
+    return _heuristic_parse(condition, fallback_reason)
 
 
 def _parse_with_llm(condition: str) -> StructuredQuery:
@@ -202,7 +206,7 @@ _NON_DESCRIPTIVE_WORDS = _IMAGE_WORDS | _TEXT_WORDS | _DATASET_WORDS | {
 }
 
 
-def _heuristic_parse(condition: str) -> StructuredQuery:
+def _heuristic_parse(condition: str, fallback_reason: str | None = None) -> StructuredQuery:
     lower = condition.lower()
 
     data_type = "text"
@@ -251,7 +255,7 @@ def _heuristic_parse(condition: str) -> StructuredQuery:
         },
         output_mode=output_mode,  # type: ignore[arg-type]
         label=label,
-        notes="parsed heuristically (no ANTHROPIC_API_KEY set)",
+        notes=f"parsed heuristically — {fallback_reason or 'reason unknown'}".strip(),
     )
     log_event(logger, "query_parsed_heuristically", condition=condition, structured_query=query.model_dump())
     return query
