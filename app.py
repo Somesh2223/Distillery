@@ -132,6 +132,16 @@ def _zero_result_hint(data_type: str) -> str:
     )
 
 
+def _shortfall_hint(data_type: str, fetched: int, requested: int) -> str:
+    configured = [c.name for c in source_router.CONNECTORS_BY_TYPE.get(data_type, []) if c.is_configured()]
+    source_desc = ", ".join(configured) if configured else "the configured connector(s)"
+    return (
+        f"Only found {fetched} of the {requested} requested — {source_desc} and the scraper fallback ran out of "
+        "distinct matches for these keywords after deduping. This is a real stopping point, not a bug: try "
+        "broader/fewer keywords, a lower count, or (for images) additional API keys so more sources can contribute."
+    )
+
+
 @app.get("/api/runs/{run_id}/results")
 def run_results(run_id: str, offset: int = 0, limit: int = 60):
     run = storage.get_run(run_id)
@@ -140,10 +150,14 @@ def run_results(run_id: str, offset: int = 0, limit: int = 60):
     items = storage.list_items_for_run(run_id, offset, limit)
     total = storage.count_items_for_run(run_id)
     hint = None
-    if total == 0 and run["status"] == "completed":
+    if run["status"] == "completed":
         structured = json.loads(run["structured_query"])
-        hint = _zero_result_hint(structured.get("data_type", "text"))
-    return {"items": items, "total": total, "run": run, "zero_result_hint": hint}
+        data_type = structured.get("data_type", "text")
+        if total == 0:
+            hint = _zero_result_hint(data_type)
+        elif total < run["requested_count"]:
+            hint = _shortfall_hint(data_type, total, run["requested_count"])
+    return {"items": items, "total": total, "run": run, "result_hint": hint}
 
 
 @app.get("/api/files/{item_id}")

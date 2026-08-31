@@ -182,13 +182,31 @@ def _fetch_with_keyword_fallback(
     # These are independent search-API calls (not downloads), so run them
     # concurrently instead of waiting on each one-by-one.
     with concurrent.futures.ThreadPoolExecutor(max_workers=min(len(query.keywords), 4)) as executor:
-        for sub_items in executor.map(_try_keyword, query.keywords):
-            for it in sub_items:
-                if len(items) >= count:
-                    break
+        per_keyword_results = list(executor.map(_try_keyword, query.keywords))
+
+    # Merge round-robin (one item at a time from each keyword branch, in
+    # rounds) rather than draining one branch before moving to the next.
+    # Otherwise a generic phrase with abundant stock matches (e.g. "polished
+    # marble floor") floods the result and crowds out rarer, more specific
+    # ones (e.g. "icy sidewalk") that better match what was actually asked
+    # for — even though every phrase came from the same keyword list.
+    cursors = [0] * len(per_keyword_results)
+    progress = True
+    while len(items) < count and progress:
+        progress = False
+        for branch_idx, branch_items in enumerate(per_keyword_results):
+            if len(items) >= count:
+                break
+            idx = cursors[branch_idx]
+            while idx < len(branch_items):
+                it = branch_items[idx]
+                idx += 1
                 if it.id not in seen_ids:
                     seen_ids.add(it.id)
                     items.append(it)
+                    progress = True
+                    break
+            cursors[branch_idx] = idx
     return items
 
 

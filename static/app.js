@@ -189,8 +189,12 @@
     excludedIds = new Set(); // fresh run — nothing discarded yet
     $("results-panel").classList.remove("hidden");
     updateResultsSummary(data.total);
-    if (data.total === 0 && data.zero_result_hint) {
-      showError($("fetch-error"), data.zero_result_hint);
+    if (data.result_hint) {
+      if (data.total === 0) {
+        showError($("fetch-error"), data.result_hint);
+      } else {
+        showInfo($("fetch-error"), data.result_hint); // partial shortfall — not an error, just explains "completed" at < requested
+      }
     }
     const grid = $("results-grid");
     grid.innerHTML = "";
