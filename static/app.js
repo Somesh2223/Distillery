@@ -5,6 +5,13 @@
 
   let currentMode = "preview";
   let currentRunId = null;
+  // The user's stable, originally-desired total — set once when a fetch
+  // starts and never changed afterward. Deliberately NOT the same as the
+  // server's run.requested_count, which the backend bumps by the full
+  // top-up amount each time regardless of how many actually arrive; using
+  // that for "how many more do I need" would drift upward on a partial
+  // top-up instead of just shrinking the remaining gap.
+  let targetCount = 0;
   let pollTimer = null;
   let excludedIds = new Set();
 
@@ -14,6 +21,7 @@
   $("fetch-btn").addEventListener("click", onFetch);
   $("export-btn").addEventListener("click", onExport);
   $("stop-btn").addEventListener("click", onStop);
+  $("topup-btn").addEventListener("click", onTopup);
 
   function setMode(mode) {
     currentMode = mode;
@@ -105,6 +113,8 @@
   async function onFetch() {
     const condition = $("condition").value.trim();
     const structured_query = buildStructuredQuery();
+    excludedIds = new Set(); // brand new run — nothing discarded yet
+    targetCount = structured_query.count; // fixed for this run's lifetime, including any top-ups
     $("fetch-btn").disabled = true;
     hideError($("fetch-error"));
     $("progress-panel").classList.remove("hidden");
@@ -186,7 +196,13 @@
     const resp = await fetch(`/api/runs/${currentRunId}/results?limit=200`);
     if (!resp.ok) return;
     const data = await resp.json();
-    excludedIds = new Set(); // fresh run — nothing discarded yet
+    // NOTE: targetCount is intentionally NOT set from data.run.requested_count
+    // here — the server bumps that by the full top-up amount regardless of
+    // how many actually arrive, which would drift the user's real target
+    // upward on a partial top-up. targetCount is set once in onFetch().
+    // NOTE: excludedIds is intentionally NOT reset here — this runs again
+    // after a top-up fetch, and previously-discarded items should stay
+    // discarded rather than reappearing as kept.
     $("results-panel").classList.remove("hidden");
     updateResultsSummary(data.total);
     if (data.result_hint) {
@@ -210,21 +226,30 @@
 
   function updateResultsSummary(total) {
     const kept = total - excludedIds.size;
+    const needed = Math.max(0, targetCount - kept);
     $("results-summary").textContent = excludedIds.size > 0
-      ? `${kept} of ${total} item(s) kept for export (${excludedIds.size} discarded — click a card to toggle)`
-      : `${total} item(s) fetched — click a card to discard ones you don't want`;
+      ? `${kept} of ${total} item(s) kept for export (${excludedIds.size} discarded)`
+      : `${total} item(s) fetched`;
+
+    const topupBtn = $("topup-btn");
+    if (needed > 0 && total > 0) {
+      topupBtn.textContent = `Fetch ${needed} more to reach your target of ${targetCount}`;
+      topupBtn.classList.remove("hidden");
+    } else {
+      topupBtn.classList.add("hidden");
+    }
+  }
+
+  function setCardDiscarded(card, btn, discarded) {
+    card.classList.toggle("discarded", discarded);
+    btn.textContent = discarded ? "↺ Restore" : "✕ Discard";
+    btn.title = discarded ? "Restore this item — include it in the dataset export again" : "Discard this item — it won't be included in the dataset export";
   }
 
   function renderCard(item) {
     const card = document.createElement("div");
     card.className = "card";
     card.dataset.itemId = item.id;
-    card.title = "Click to discard/keep this item";
-
-    const discardBadge = document.createElement("div");
-    discardBadge.className = "discard-badge";
-    discardBadge.textContent = "discarded";
-    card.appendChild(discardBadge);
 
     if (item.local_path) {
       const filename = item.local_path.split("/").pop() || `${item.id}.dat`;
@@ -234,9 +259,28 @@
       downloadLink.download = filename;
       downloadLink.title = "Download this item";
       downloadLink.textContent = "⬇";
-      downloadLink.addEventListener("click", (e) => e.stopPropagation()); // don't also toggle discard
       card.appendChild(downloadLink);
     }
+
+    // Always-visible discard control — not just a hint in the summary text,
+    // so a first-time user can see at a glance that every card is
+    // actionable, without having to already know to click it.
+    const discardBtn = document.createElement("button");
+    discardBtn.type = "button";
+    discardBtn.className = "discard-btn";
+    setCardDiscarded(card, discardBtn, excludedIds.has(item.id));
+    discardBtn.addEventListener("click", () => {
+      const id = card.dataset.itemId;
+      const nowDiscarded = !excludedIds.has(id);
+      if (nowDiscarded) {
+        excludedIds.add(id);
+      } else {
+        excludedIds.delete(id);
+      }
+      setCardDiscarded(card, discardBtn, nowDiscarded);
+      updateResultsSummary($("results-grid").children.length);
+    });
+    card.appendChild(discardBtn);
 
     if (item.data_type === "image" && item.local_path) {
       const img = document.createElement("img");
@@ -262,19 +306,37 @@
     body.appendChild(meta);
     card.appendChild(body);
 
-    card.addEventListener("click", () => {
-      const id = card.dataset.itemId;
-      if (excludedIds.has(id)) {
-        excludedIds.delete(id);
-        card.classList.remove("discarded");
-      } else {
-        excludedIds.add(id);
-        card.classList.add("discarded");
-      }
-      updateResultsSummary($("results-grid").children.length);
-    });
-
     return card;
+  }
+
+  async function onTopup() {
+    if (!currentRunId) return;
+    const topupBtn = $("topup-btn");
+    const kept = $("results-grid").children.length - excludedIds.size;
+    const needed = Math.max(0, targetCount - kept);
+    if (needed <= 0) return;
+
+    topupBtn.disabled = true;
+    hideError($("fetch-error"));
+    $("progress-panel").classList.remove("hidden");
+    $("progress-label").textContent = "Starting top-up fetch...";
+    const stopBtn = $("stop-btn");
+    stopBtn.classList.remove("hidden");
+    stopBtn.disabled = false;
+    stopBtn.textContent = "Stop fetch";
+    try {
+      const resp = await fetch(`/api/runs/${currentRunId}/topup`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ count: needed }),
+      });
+      if (!resp.ok) throw new Error(await resp.text());
+      pollStatus();
+    } catch (err) {
+      showError($("fetch-error"), "Failed to start top-up fetch: " + err.message);
+    } finally {
+      topupBtn.disabled = false;
+    }
   }
 
   async function onExport() {

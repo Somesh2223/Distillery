@@ -130,14 +130,24 @@ fallback, and a heuristic query parser instead of the LLM.
   (`MATERIALIZE_WORKERS` in `.env`, default 8) instead of one item at a
   time — roughly a 4-5x speedup in practice. Dedup state is kept consistent
   across threads with a lock around the check-and-reserve step.
-- **Manual curation before export.** The results grid lets you click any
-  card to discard it (dimmed, marked "discarded") — discarded items are
-  excluded from the dataset export/zip but stay in the preview so you can
-  toggle them back. This exists because no amount of keyword tuning fully
-  guarantees visual relevance from a stock-photo API (e.g. "slippery
-  surface" pulls in warning-sign photos no matter how the query is phrased,
-  since that's how the library itself tags the concept) — manual review is
-  the only fully reliable filter.
+- **Manual curation before export.** Every card has an always-visible
+  "✕ Discard" button (not just a hint in passing text, so it's obvious to a
+  first-time user) that dims the card and excludes it from the dataset
+  export/zip; click again ("↺ Restore") to bring it back. This exists
+  because no amount of keyword tuning fully guarantees visual relevance from
+  a stock-photo API (e.g. "slippery surface" pulls in warning-sign photos no
+  matter how the query is phrased, since that's how the library itself tags
+  the concept) — manual review is the only fully reliable filter.
+- **"Fetch N more" top-up.** Discarding items (or a partial shortfall) can
+  leave you with fewer kept items than you originally asked for — a "Fetch N
+  more to reach your target of X" button appears whenever that's true
+  (`POST /api/runs/{run_id}/topup`). It asks connectors for a larger
+  candidate pool than the gap itself (not just N), since requesting exactly
+  N would just re-return the same top-ranked — already-seen — results for an
+  unchanged query; dedup then surfaces genuinely new ones beyond what's
+  already been fetched. Your original target count stays fixed across
+  top-ups even if one falls short, so the "N more" gap just shrinks rather
+  than the goalpost drifting.
 - **Single-item download.** Each card in the results grid has a small ⬇
   button (top-left) to save just that one item, independent of the
   "Download dataset (.zip)" bulk export.

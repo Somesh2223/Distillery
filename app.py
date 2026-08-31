@@ -58,10 +58,16 @@ def parse_condition(req: ParseRequest):
 _CANCEL_EVENTS: dict[str, threading.Event] = {}
 
 
-def _run_fetch_job(run_id: str, query: StructuredQuery, cancel_event: threading.Event) -> None:
+def _run_fetch_job(
+    run_id: str,
+    query: StructuredQuery,
+    cancel_event: threading.Event,
+    existing_count: int = 0,
+    target_new: Optional[int] = None,
+) -> None:
     storage.update_run_status(run_id, "running")
     try:
-        source_router.route(query, run_id, cancel_event=cancel_event)
+        source_router.route(query, run_id, cancel_event=cancel_event, existing_count=existing_count, target_new=target_new)
         storage.update_run_status(run_id, "cancelled" if cancel_event.is_set() else "completed")
     except Exception as exc:
         logger.exception("fetch job failed for run %s", run_id)
@@ -97,6 +103,43 @@ def cancel_run(run_id: str):
         raise HTTPException(409, f"run is already '{run['status']}' — nothing to stop")
     cancel_event.set()
     return {"status": "cancelling"}
+
+
+class TopupRequest(BaseModel):
+    count: int
+
+
+@app.post("/api/runs/{run_id}/topup")
+def topup_run(run_id: str, req: TopupRequest):
+    """Fetches `count` more items on top of what a run already has — used
+    when discarding items (or a partial shortfall) leaves you with fewer
+    kept items than you originally asked for."""
+    run = storage.get_run(run_id)
+    if not run:
+        raise HTTPException(404, "run not found")
+    if run["status"] not in ("completed", "cancelled", "failed"):
+        raise HTTPException(409, f"run is '{run['status']}' — wait for it to finish before topping up")
+    if req.count <= 0:
+        raise HTTPException(400, "count must be positive")
+
+    structured = json.loads(run["structured_query"])
+    base_query = StructuredQuery.model_validate(structured)
+    baseline = storage.count_items_for_run(run_id)
+    # Ask connectors for a candidate pool covering both what's already fetched
+    # and the new amount — requesting exactly `req.count` would just re-return
+    # the same top-ranked (already-duplicate) results for the same query.
+    topup_query = base_query.model_copy(update={"count": baseline + req.count})
+    storage.set_run_requested_count(run_id, run["requested_count"] + req.count)
+
+    cancel_event = threading.Event()
+    _CANCEL_EVENTS[run_id] = cancel_event
+    thread = threading.Thread(
+        target=_run_fetch_job,
+        args=(run_id, topup_query, cancel_event, baseline, req.count),
+        daemon=True,
+    )
+    thread.start()
+    return {"run_id": run_id, "topping_up": req.count}
 
 
 @app.get("/api/runs/{run_id}/status")

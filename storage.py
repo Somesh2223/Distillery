@@ -128,6 +128,16 @@ def set_run_fetched_count(run_id: str, count: int) -> None:
         )
 
 
+def set_run_requested_count(run_id: str, count: int) -> None:
+    """Used by /topup to raise the target when the user asks for replacements
+    on top of what a run already fetched."""
+    with cursor() as cur:
+        cur.execute(
+            "UPDATE runs SET requested_count = ?, updated_at = ? WHERE id = ?",
+            (count, _now(), run_id),
+        )
+
+
 def set_run_dataset_path(run_id: str, path: str) -> None:
     with cursor() as cur:
         cur.execute(
