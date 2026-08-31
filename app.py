@@ -210,8 +210,12 @@ def run_results(run_id: str, offset: int = 0, limit: int = 60):
 
 
 @app.get("/api/files/{item_id}")
-def get_file(item_id: str):
-    item = storage.get_item(item_id)
+def get_file(item_id: str, run_id: Optional[str] = None):
+    # run_id disambiguates which row to serve — since dedup is per-run by
+    # default, the same source URL fetched in two different runs produces
+    # two rows sharing this id, potentially pointing at different files (or
+    # one whose file has since been cleaned up). Always pass it when known.
+    item = storage.get_item(item_id, run_id=run_id)
     if not item or not item["local_path"]:
         raise HTTPException(404, "file not found")
     path = FETCHED_DIR / item["local_path"]

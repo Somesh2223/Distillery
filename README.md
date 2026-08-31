@@ -137,6 +137,12 @@ fallback, and a heuristic query parser instead of the LLM.
   Advanced filters (`filters.dedupe_across_runs`) restores the old global
   behavior, for when you deliberately want one non-repeating library built
   up over many runs instead of independent per-query results.
+  One consequence: the same source URL fetched in two different runs now
+  produces two separate database rows sharing an id (each run downloads and
+  stores its own copy). `/api/files/{item_id}` takes an optional `run_id`
+  query param to disambiguate which one to serve — the UI always passes it —
+  and falls back to whichever matching row's file still exists on disk if
+  it's omitted.
 - **Concurrent fetching.** Downloading/deduping/saving each item is the
   dominant cost of a run, so it happens across a small thread pool
   (`MATERIALIZE_WORKERS` in `.env`, default 8) instead of one item at a

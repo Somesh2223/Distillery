@@ -12,7 +12,7 @@ import time
 from contextlib import contextmanager
 from typing import Any, Iterator, Optional
 
-from config import DB_PATH
+from config import DB_PATH, FETCHED_DIR
 from connectors.base import Item
 
 _LOCK = threading.RLock()
@@ -260,11 +260,29 @@ def count_items_for_run(run_id: str) -> int:
         return cur.fetchone()["c"]
 
 
-def get_item(item_id: str) -> Optional[dict]:
+def get_item(item_id: str, run_id: Optional[str] = None) -> Optional[dict]:
+    """`id` is only unique WITHIN a run now (see the schema note above a
+    per-run dedup was added) — the same source URL fetched in two different
+    runs produces two rows sharing an id, potentially with different
+    local_path values. Always pass `run_id` when you know which run you're
+    displaying, or this can return an unrelated run's row (e.g. one whose
+    file has since been cleaned up)."""
     with cursor() as cur:
-        cur.execute("SELECT * FROM items WHERE id = ?", (item_id,))
-        row = cur.fetchone()
-        return dict(row) if row else None
+        if run_id is not None:
+            cur.execute("SELECT * FROM items WHERE id = ? AND run_id = ?", (item_id, run_id))
+            row = cur.fetchone()
+            if row:
+                return dict(row)
+        # No run_id given, or no row for that specific run — fall back to
+        # any matching row, preferring one whose file still exists on disk.
+        cur.execute("SELECT * FROM items WHERE id = ? ORDER BY rowid DESC", (item_id,))
+        candidates = [dict(r) for r in cur.fetchall()]
+    if not candidates:
+        return None
+    for candidate in candidates:
+        if candidate["local_path"] and (FETCHED_DIR / candidate["local_path"]).exists():
+            return candidate
+    return candidates[0]
 
 
 # --- scrape log ---
