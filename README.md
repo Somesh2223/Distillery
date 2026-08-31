@@ -41,7 +41,12 @@ with full manifests.
    (e.g. `["slippery surface", "wet floor", "ice"]`) rather than modifying
    words meant to combine, that joined string can be too narrow to match
    anything — so a connector/scraper call that comes up short is retried
-   with each keyword phrase individually before moving on.
+   with each keyword phrase individually before moving on. Results from
+   those individual-phrase retries are merged round-robin (one from each
+   phrase per round), not by draining one phrase's results before the next —
+   otherwise a generic phrase with abundant stock matches (e.g. "polished
+   marble floor") can flood the results and crowd out rarer, more specific
+   ones (e.g. "icy sidewalk") that better match the actual request.
 3. **Dedup** (`dedup.py`) — perceptual hashing (`imagehash`) for images,
    shingle/MinHash similarity for text — checked against both the current
    batch and everything previously indexed in SQLite.
