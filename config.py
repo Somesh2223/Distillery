@@ -36,7 +36,7 @@ PIXABAY_API_KEY = os.getenv("PIXABAY_API_KEY", "")
 NEWSAPI_KEY = os.getenv("NEWSAPI_KEY", "")
 REDDIT_CLIENT_ID = os.getenv("REDDIT_CLIENT_ID", "")
 REDDIT_CLIENT_SECRET = os.getenv("REDDIT_CLIENT_SECRET", "")
-REDDIT_USER_AGENT = os.getenv("REDDIT_USER_AGENT", "DataFetcher/0.1")
+REDDIT_USER_AGENT = os.getenv("REDDIT_USER_AGENT", "Distillery/0.1")
 
 # --- Web search (used by the scraper fallback to discover candidate URLs
 # across the whole web; without it, the scraper only works against domains
@@ -47,7 +47,7 @@ GOOGLE_CSE_CX = os.getenv("GOOGLE_CSE_CX", "")
 # --- Scraper behavior ---
 SCRAPER_USER_AGENT = os.getenv(
     "SCRAPER_USER_AGENT",
-    "DataFetcherBot/0.1 (+https://github.com/Somesh2223/DataFetcher; contact: set SCRAPER_USER_AGENT in .env)",
+    "DistilleryBot/0.1 (+https://github.com/Somesh2223/Distillery; contact: set SCRAPER_USER_AGENT in .env)",
 )
 SCRAPER_MAX_PAGES_PER_DOMAIN = int(os.getenv("SCRAPER_MAX_PAGES_PER_DOMAIN", "5"))
 SCRAPER_MIN_DELAY_SECONDS = float(os.getenv("SCRAPER_MIN_DELAY_SECONDS", "1.0"))

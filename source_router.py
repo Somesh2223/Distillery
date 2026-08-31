@@ -273,7 +273,7 @@ def _materialize_and_dedup(
 
 def _materialize_image(item: Item, run_id: str, existing_phashes: list[str], lock: threading.Lock) -> bool:
     try:
-        resp = _HTTP_SESSION.get(item.source_url, timeout=20, stream=True, headers={"User-Agent": "DataFetcher/0.1"})
+        resp = _HTTP_SESSION.get(item.source_url, timeout=20, stream=True, headers={"User-Agent": "Distillery/0.1"})
         resp.raise_for_status()
     except requests.RequestException as exc:
         log_event(logger, "image_download_failed", level=30, url=item.source_url, error=str(exc))

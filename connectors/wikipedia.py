@@ -37,7 +37,7 @@ def _search_titles(term: str, limit: int) -> list[str]:
         "format": "json",
     }
     try:
-        resp = requests.get(API_URL, params=params, timeout=15, headers={"User-Agent": "DataFetcher/0.1"})
+        resp = requests.get(API_URL, params=params, timeout=15, headers={"User-Agent": "Distillery/0.1"})
         resp.raise_for_status()
     except requests.RequestException as exc:
         log_event(logger, "wikipedia_search_failed", level=40, error=str(exc))
@@ -89,7 +89,7 @@ class WikipediaConnector(BaseConnector):
             "format": "json",
         }
         try:
-            resp = requests.get(API_URL, params=params, timeout=15, headers={"User-Agent": "DataFetcher/0.1"})
+            resp = requests.get(API_URL, params=params, timeout=15, headers={"User-Agent": "Distillery/0.1"})
             resp.raise_for_status()
         except requests.RequestException as exc:
             log_event(logger, "wikipedia_extract_failed", level=40, title=title, error=str(exc))
@@ -130,7 +130,7 @@ class WikipediaTableConnector(BaseConnector):
 
         page_url = f"https://en.wikipedia.org/wiki/{title.replace(' ', '_')}"
         try:
-            resp = requests.get(page_url, timeout=20, headers={"User-Agent": "DataFetcher/0.1"})
+            resp = requests.get(page_url, timeout=20, headers={"User-Agent": "Distillery/0.1"})
             resp.raise_for_status()
         except requests.RequestException as exc:
             log_event(logger, "wikipedia_page_fetch_failed", level=40, title=title, error=str(exc))

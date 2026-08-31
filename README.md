@@ -1,15 +1,14 @@
-# DataFetcher
+# Distillery
 
-A local web app that fetches data from the web — images, articles, or
-structured tables/listings — based on a plain-English condition, and can
-optionally package the results into a labeled dataset for training/testing an
-ML model.
+A local web app that distills data from the web — images, articles, or
+structured tables/listings — into a labeled dataset, based on a plain-English
+condition. Optionally packages the results for training/testing an ML model.
 
 You type something like:
 
 > 50 high-resolution photos of red sports cars from the side, no watermarks
 
-...and DataFetcher parses that into a structured query, routes it to the
+...and Distillery parses that into a structured query, routes it to the
 right API (or a robots.txt-respecting fallback scraper if no API fits or the
 API comes up short), deduplicates against everything it's fetched before, and
 either shows you a preview grid or exports a train/val/test-split dataset zip
@@ -61,7 +60,7 @@ with full manifests.
 ## Project structure
 
 ```
-DataFetcher/
+Distillery/
 ├── app.py                 # FastAPI app + endpoints
 ├── config.py               # loads .env, paths, thresholds
 ├── models.py               # StructuredQuery / filters / export options
@@ -102,7 +101,7 @@ uvicorn app:app --reload
 
 Open http://127.0.0.1:8000 in your browser.
 
-Every API integration is optional. DataFetcher checks each connector's
+Every API integration is optional. Distillery checks each connector's
 `is_configured()` and skips it (falling through to the next connector, then
 to the scraper) if its keys are missing — so it runs out of the box with
 zero keys, using Wikipedia + Hacker News (no key required) and the scraper
