@@ -1,0 +1,24 @@
+<svg viewBox="0 0 680 680" xmlns="http://www.w3.org/2000/svg" role="img">
+<title>Distillery</title>
+<desc>Simplified Distillery mark: a magnifying glass over flat colored data tiles with an AI badge.</desc>
+<defs>
+<linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+<stop offset="0" stop-color="#4f8cff"/>
+<stop offset="1" stop-color="#33d69f"/>
+</linearGradient>
+</defs>
+
+<circle cx="300" cy="300" r="170" fill="rgba(140,150,165,0.08)" stroke="url(#g)" stroke-width="30"/>
+
+<rect x="220" y="220" width="70" height="70" rx="12" fill="#4f8cff"/>
+<rect x="300" y="220" width="70" height="70" rx="12" fill="#8b6fff"/>
+<rect x="220" y="300" width="70" height="70" rx="12" fill="#33d69f"/>
+<rect x="300" y="300" width="70" height="70" rx="12" fill="#38bdf8"/>
+
+<line x1="429" y1="429" x2="535" y2="535" stroke="url(#g)" stroke-width="58" stroke-linecap="round"/>
+
+<circle cx="447" cy="215" r="52" fill="url(#g)"/>
+<circle cx="430" cy="202" r="9" fill="#ffffff"/>
+<circle cx="464" cy="202" r="9" fill="#ffffff"/>
+<circle cx="447" cy="230" r="9" fill="#ffffff"/>
+</svg>

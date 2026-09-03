@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Distillery</title>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <style>
   :root {
     --bg: #0f1216;
@@ -28,9 +29,11 @@
     padding: 20px 28px;
     border-bottom: 1px solid var(--border);
     display: flex;
-    align-items: baseline;
+    align-items: center;
     gap: 12px;
   }
+  header img.logo { width: 32px; height: 32px; flex-shrink: 0; }
+  header .title-group { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
   header h1 { font-size: 20px; margin: 0; }
   header span { color: var(--muted); font-size: 13px; }
   main {
@@ -178,8 +181,11 @@
 </head>
 <body>
 <header>
-  <h1>Distillery</h1>
-  <span>distill web data into a labeled ML dataset from a plain-English condition</span>
+  <img class="logo" src="/logo.svg" alt="Distillery logo">
+  <div class="title-group">
+    <h1>Distillery</h1>
+    <span>distill web data into a labeled ML dataset from a plain-English condition</span>
+  </div>
 </header>
 <main>
 
