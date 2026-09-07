@@ -44,21 +44,30 @@
 </script>
 <style>
   * { box-sizing: border-box; }
-  body { background: #111317; margin: 0; }
+  html, body { background: #111317; margin: 0; height: 100%; overflow: hidden; }
   .hidden { display: none !important; }
 
   @keyframes fadeUp { from { opacity: 0; transform: translate3d(0, 20px, 0); } to { opacity: 1; transform: translate3d(0, 0, 0); } }
   .fade-up { animation: fadeUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) both; }
   @media (prefers-reduced-motion: reduce) { .fade-up { animation: none; } }
 
-  /* --- Per-step atmospheric background (Stitch's WebGL shader + photo) --- */
-  .step { position: relative; }
-  .step-atmosphere { position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 0; }
-  .step-atmosphere.fixed-atmosphere { position: fixed; }
+  /* --- Swipe-slide track: each step is a full 100vw/100vh slide, and
+     moving to the next one slides the whole track left instead of the
+     page just scrolling down past a stack of panels. --- */
+  #swipe-track { display: flex; height: 100vh; width: 100%; transition: transform 0.7s cubic-bezier(0.65, 0, 0.35, 1); will-change: transform; }
+  @media (prefers-reduced-motion: reduce) { #swipe-track { transition: none; } }
+  .step { flex: 0 0 100vw; width: 100vw; height: 100vh; overflow-y: auto; overflow-x: hidden; position: relative; -webkit-overflow-scrolling: touch; }
+
+  /* --- Per-step atmospheric background (Stitch's WebGL shader + photo) ---
+     position:sticky (not fixed/absolute) so it stays pinned to the top of
+     THIS slide's own viewport-height scroll area even when the slide's own
+     content (e.g. a long results grid) scrolls taller than one screen —
+     a plain absolute background would just scroll away with the content. */
+  .step-atmosphere { position: sticky; top: 0; height: 100vh; margin-bottom: -100vh; overflow: hidden; pointer-events: none; z-index: 0; }
   .step-atmosphere canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
-  .step-atmosphere img { position: absolute; inset: -5%; width: 110%; height: 110%; object-fit: cover; opacity: 0.3; will-change: transform; transform: translate3d(0,0,0) scale(1.05); transition: transform 0.6s cubic-bezier(0.16,1,0.3,1); }
-  .step-atmosphere::after { content: ""; position: absolute; inset: 0; background: linear-gradient(to bottom, rgba(17,19,23,0.2), rgba(17,19,23,0.75)); }
-  .step-content { position: relative; z-index: 10; }
+  .step-atmosphere img { position: absolute; inset: -5%; width: 110%; height: 110%; object-fit: cover; opacity: 0.55; will-change: transform; transform: translate3d(0,0,0) scale(1.05); transition: transform 0.6s cubic-bezier(0.16,1,0.3,1); }
+  .step-atmosphere::after { content: ""; position: absolute; inset: 0; background: linear-gradient(to bottom, rgba(17,19,23,0.1), rgba(17,19,23,0.55)); }
+  .step-content { position: relative; z-index: 10; min-height: 100vh; box-sizing: border-box; }
 
   .glass-panel {
     background: rgba(17, 19, 23, 0.5);
@@ -168,13 +177,14 @@
   .line-clamp-3 { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 </style>
 </head>
-<body class="text-on-surface antialiased overflow-x-hidden min-h-screen">
+<body class="text-on-surface antialiased">
+<div id="swipe-track">
 
 <!-- ============================================================ -->
 <!-- STEP 1 — Condition input                                     -->
 <!-- ============================================================ -->
-<section class="step">
-  <div class="step-atmosphere" id="atmo-1"><canvas></canvas><img alt="" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAlfEm24YHgG9Pe9mXxDnoZommWjp5BCB0f7Wq7m1raXvV8iQEIlo4W8rTckiPt6kIfQAoQehS9C3hmD8N0UfSRnIWaEZHEFedypEM0A_Rw350Nki9R1DZB9FgB-ckoxE935BBmByiEVXP773aJnBs1dF8fAKpuKVBCmNJHdcb812InJGSaffQ1WPaCh6o_TbKse69cX2kSR8Xy7fqZjGgY3d9Ie_C_zLoOYKwoUxKd9Xyc-tybug93SQ"></div>
+<section class="step" id="step-condition">
+  <div class="step-atmosphere" id="atmo-1"><canvas></canvas><img alt="" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAlfEm24YHgG9Pe9mXxDnoZommWjp5BCB0f7Wq7m1raXvV8iQEIlo4W8rTckiPt6kIfQAoQehS9C3hmD8N0UfSRnIWaEZHEFedypEM0A_Rw350Nki9R1DZB9FgB-ckoxE935BBmByiEVXP773aJnBs1dF8fAKpuKVBCmNJHdcb812InJGSaffQ1WPaCh6o_TbKse69cX2kSR8Xy7fqZjGgY3d9Ie_C_zLoOYKwoUxKd9Xyc-tybug93SQ=s1920"></div>
   <main class="step-content w-full max-w-max-width mx-auto px-gutter py-margin-page flex flex-col items-center">
     <div class="mb-stack-lg fade-up text-center flex items-center gap-3 justify-center">
       <img src="/logo.svg" alt="" class="w-10 h-10 md:w-12 md:h-12">
@@ -220,7 +230,7 @@
 <!-- STEP 2 — Review parameters / parsed filters                  -->
 <!-- ============================================================ -->
 <section class="step hidden" id="filters-panel">
-  <div class="step-atmosphere" id="atmo-2"><canvas></canvas><img alt="" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDavaSIZJgH3J5Wupg5NmsDODH5zA161YmaRpjYWi9yiL6wFaSDUtse_u5WirBvA7hyXSehDDwDYWN_FWT5qbrDmuLRssKZoq6vkR5gHJ7PlHROngMsjBmd59RNvVfCwgoeUUgf3ihNIc-mVei_emz6hI-NIiXoQ4sPsm7WFnHlCJSrP7lIcPs0oZigItc9Rf60LRgOZ-pZ9INvwrKm4ErVkn4Vd6IjhCciFIIJkA8aCsM49wkayJ7Ntg"></div>
+  <div class="step-atmosphere" id="atmo-2"><canvas></canvas><img alt="" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDavaSIZJgH3J5Wupg5NmsDODH5zA161YmaRpjYWi9yiL6wFaSDUtse_u5WirBvA7hyXSehDDwDYWN_FWT5qbrDmuLRssKZoq6vkR5gHJ7PlHROngMsjBmd59RNvVfCwgoeUUgf3ihNIc-mVei_emz6hI-NIiXoQ4sPsm7WFnHlCJSrP7lIcPs0oZigItc9Rf60LRgOZ-pZ9INvwrKm4ErVkn4Vd6IjhCciFIIJkA8aCsM49wkayJ7Ntg=s1920"></div>
   <main class="step-content w-full max-w-max-width mx-auto px-gutter py-margin-page flex flex-col justify-center">
     <header class="mb-stack-lg text-center fade-up">
       <h1 class="font-headline-lg text-headline-lg text-primary mb-stack-sm">Review parameters</h1>
@@ -353,7 +363,7 @@
 <!-- STEP 3 — Live fetch                                          -->
 <!-- ============================================================ -->
 <section class="step hidden" id="progress-panel">
-  <div class="step-atmosphere" id="atmo-3"><canvas></canvas><img alt="" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBgIlDPyUmsg37BHpjfvRu1tu4HhZLx5HVKC1XoNS7F6zQQc6d7Apt4Ks9FP6Wa4X3ZwFzqP1wbCCd4pLORwV_d3QmqBNGLUTlY79c_YPNvyJR1euOhZgSsBaLTf7mHEE7XSZ71XrY-ME-LhjpUX1_yol8QxsoOAdqPB4eC5nNUGzD-osVqGdDZcz4t_sDZXAAF1oy5bXRRxRfYZJfMHM8lnxK7LytbzIwjyF8j2QWeqvY_cGXOO4Ls0g"></div>
+  <div class="step-atmosphere" id="atmo-3"><canvas></canvas><img alt="" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBgIlDPyUmsg37BHpjfvRu1tu4HhZLx5HVKC1XoNS7F6zQQc6d7Apt4Ks9FP6Wa4X3ZwFzqP1wbCCd4pLORwV_d3QmqBNGLUTlY79c_YPNvyJR1euOhZgSsBaLTf7mHEE7XSZ71XrY-ME-LhjpUX1_yol8QxsoOAdqPB4eC5nNUGzD-osVqGdDZcz4t_sDZXAAF1oy5bXRRxRfYZJfMHM8lnxK7LytbzIwjyF8j2QWeqvY_cGXOO4Ls0g=s1920"></div>
   <main class="step-content w-full max-w-max-width mx-auto px-gutter py-margin-page flex flex-col items-center">
     <div class="glass-panel w-full max-w-md rounded-2xl p-padding-panel flex flex-col gap-stack-lg shadow-2xl fade-up">
       <div class="flex flex-col items-center text-center gap-stack-sm mb-2">
@@ -366,12 +376,12 @@
       <div class="flex flex-col gap-stack-md w-full px-2">
         <div class="flex justify-between items-end mb-1">
           <span class="text-label-caps text-outline-variant uppercase">Progress</span>
-          <div class="text-title-md text-on-surface font-medium flex items-center gap-2 font-code">
+          <div class="text-[32px] leading-none text-primary font-semibold flex items-center gap-2 font-code drop-shadow-[0_0_12px_rgba(173,198,255,0.35)]">
             <span class="rolling-number-container">
               <span class="rolling-number-inner" id="counter-inner-current"><span>0</span><span>0</span></span>
             </span>
             <span class="text-outline">/</span>
-            <span id="progress-target">0</span>
+            <span id="progress-target" class="text-on-surface-variant">0</span>
           </div>
         </div>
         <div class="progress-bar-container">
@@ -396,9 +406,10 @@
 <!-- STEP 4 — Results gallery + export builder                    -->
 <!-- ============================================================ -->
 <section class="step hidden" id="results-panel">
-  <div class="step-atmosphere fixed-atmosphere" id="atmo-4"><canvas></canvas><img alt="" src="https://lh3.googleusercontent.com/aida/AEtjO1WzT2WDbmvoxOP4QpoddUlnTASPN1hvNniBsVNjOAp3zu8iiLiholV0JeZmIJlBWDDwlcX4EE_dqRniKIBh7iQH8A6wNLQtVl5opx0BkBqALuAfoFWksiOV3Vz8jJternUrE7tpOTeXbsOGUVacXgdq30--hYCx7U58GyMQQEXzzCDhQ_xP4lJE4rQtTQnMlRQGx4TYDnahQi_HLzsHX8Dm4wABN5if7NsJlwKXhMCREMM1jnVzDjkl7EMQ"></div>
+  <div class="step-atmosphere" id="atmo-4"><canvas></canvas><img alt="" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDHhun4k_DfkMH7985ZG42WK1k-M2VMHlIdifPMkBNJI3bg5dotHWu3re0HZyUoPDTfNMYjquYbFuMtnh_KhnoGs6AepV7edAFaOY37wriuq5Twb2xi9n7GbbVNwYbeHqSAOhYmwao5zXDoLU_XjNp1NHW0wysc0tKMhQSUTpd8dIJjndJMxOjSYEyjmljz597yrAVIe4Qxeu8paV0k2cmVYhYdQCXo1Zw_lUDEinkUvW5QmaYzzZhTTA=s1920"></div>
 
-  <nav class="step-content sticky top-0 z-30 bg-surface/30 backdrop-blur-md border-b border-white/10">
+  <div class="step-content">
+  <nav class="sticky top-0 z-30 bg-surface/30 backdrop-blur-md border-b border-white/10">
     <div class="flex justify-between items-center h-16 px-gutter max-w-max-width mx-auto">
       <div class="flex items-center gap-2">
         <img src="/logo.svg" alt="" class="w-6 h-6">
@@ -412,7 +423,7 @@
     </div>
   </nav>
 
-  <main class="step-content pt-stack-lg pb-40 px-gutter max-w-max-width mx-auto w-full">
+  <main class="pt-stack-lg pb-40 px-gutter max-w-max-width mx-auto w-full">
     <header class="mb-stack-lg flex flex-col md:flex-row md:items-end justify-between gap-stack-md">
       <div>
         <h1 class="font-display-lg text-headline-lg text-on-surface mb-stack-sm">Results gallery</h1>
@@ -507,13 +518,15 @@
     </div>
   </main>
 
-  <footer class="step-content w-full py-stack-lg border-t border-white/5 bg-transparent">
+  <footer class="w-full py-stack-lg border-t border-white/5 bg-transparent">
     <div class="flex flex-col sm:flex-row justify-between max-w-max-width mx-auto px-gutter items-center gap-2 text-center sm:text-left">
       <div class="text-label-caps uppercase text-outline" id="footer-year"></div>
       <div class="text-label-caps uppercase text-outline">Local tool — respects robots.txt and each API's rate limits. Check per-item license/attribution before training use.</div>
     </div>
   </footer>
+  </div>
 </section>
+</div><!-- #swipe-track -->
 
 <script src="/app.js"></script>
 <script>
@@ -594,6 +607,26 @@
     trainSlider.addEventListener("input", () => updateSplits("train"));
     valSlider.addEventListener("input", () => updateSplits("val"));
     testSlider.addEventListener("input", () => updateSplits("test"));
+  })();
+
+  // Swipe-slide controller — advances the track to the next step whenever
+  // app.js reveals it (removes "hidden" from filters-panel/progress-panel/
+  // results-panel), instead of the page just scrolling down to it.
+  (function () {
+    const track = document.getElementById("swipe-track");
+    const order = ["step-condition", "filters-panel", "progress-panel", "results-panel"];
+    let current = 0;
+    function goTo(index) {
+      current = index;
+      track.style.transform = `translateX(-${index * 100}vw)`;
+    }
+    order.forEach((id, index) => {
+      if (index === 0) return; // step 1 is visible from the start
+      const el = document.getElementById(id);
+      new MutationObserver(() => {
+        if (!el.classList.contains("hidden") && current < index) goTo(index);
+      }).observe(el, { attributes: true, attributeFilter: ["class"] });
+    });
   })();
 
   // Footer year + export dataset info card (label/count aren't known until
