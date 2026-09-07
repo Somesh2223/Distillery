@@ -248,7 +248,12 @@
     for (const item of data.items) {
       grid.appendChild(renderCard(item));
     }
-    if (data.run.output_mode === "dataset" && data.total > 0) {
+    // Always offer the export/download step once there's something to
+    // export — "Quick preview" vs "Build dataset" only ever affected the
+    // default count, and hiding the download option behind that toggle
+    // left no way to get your results out at all if you'd started in
+    // preview mode.
+    if (data.total > 0) {
       $("export-section").classList.remove("hidden");
     } else {
       $("export-section").classList.add("hidden");
