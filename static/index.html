@@ -14,40 +14,28 @@
     theme: {
       extend: {
         colors: {
-          primary: "#adc6ff",
-          "primary-fixed": "#d8e2ff",
-          "primary-container": "#4d8eff",
-          secondary: "#4edea3",
-          "secondary-fixed": "#6ffbbe",
+          primary: "#adc6ff", "primary-fixed": "#d8e2ff", "primary-container": "#4d8eff",
+          secondary: "#4edea3", "secondary-fixed": "#6ffbbe",
           tertiary: "#c0c1ff",
-          background: "#111317",
-          surface: "#111317",
-          "surface-container": "#1e2024",
-          "surface-container-high": "#282a2e",
-          "surface-variant": "#333539",
-          "on-surface": "#e2e2e8",
-          "on-surface-variant": "#c2c6d6",
-          outline: "#8c909f",
-          "outline-variant": "#424754",
+          background: "#111317", surface: "#111317",
+          "surface-container": "#1e2024", "surface-container-high": "#282a2e", "surface-variant": "#333539",
+          "on-surface": "#e2e2e8", "on-surface-variant": "#c2c6d6",
+          outline: "#8c909f", "outline-variant": "#424754",
           error: "#ffb4ab",
         },
         borderRadius: { DEFAULT: "0.25rem", lg: "0.5rem", xl: "0.75rem", full: "9999px" },
         spacing: {
-          "max-width": "760px",
-          gutter: "24px",
-          "padding-panel": "32px",
-          "stack-sm": "8px",
-          "margin-page": "40px",
-          "stack-md": "16px",
-          "stack-lg": "32px",
+          "max-width": "980px", gutter: "24px", "padding-panel": "32px",
+          "stack-sm": "8px", "margin-page": "40px", "stack-md": "16px", "stack-lg": "32px",
         },
         fontFamily: { sans: ["Inter"], code: ["Geist"] },
         fontSize: {
           "body-sm": ["14px", { lineHeight: "20px", fontWeight: "400" }],
           "body-lg": ["16px", { lineHeight: "24px", fontWeight: "400" }],
-          "display-lg": ["40px", { lineHeight: "48px", letterSpacing: "-0.02em", fontWeight: "700" }],
+          "display-lg": ["44px", { lineHeight: "52px", letterSpacing: "-0.02em", fontWeight: "700" }],
           "label-caps": ["12px", { lineHeight: "16px", letterSpacing: "0.05em", fontWeight: "600" }],
-          "title-md": ["18px", { lineHeight: "26px", fontWeight: "500" }],
+          "title-md": ["20px", { lineHeight: "28px", fontWeight: "500" }],
+          "headline-lg": ["28px", { lineHeight: "36px", letterSpacing: "-0.01em", fontWeight: "600" }],
           code: ["13px", { lineHeight: "20px", fontWeight: "400" }],
         },
       },
@@ -56,361 +44,481 @@
 </script>
 <style>
   * { box-sizing: border-box; }
-  body { background: #111317; }
-
+  body { background: #111317; margin: 0; }
   .hidden { display: none !important; }
 
-  @keyframes fadeUp { from { opacity: 0; transform: translate3d(0, 16px, 0); } to { opacity: 1; transform: translate3d(0, 0, 0); } }
-  .fade-up { animation: fadeUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) both; }
+  @keyframes fadeUp { from { opacity: 0; transform: translate3d(0, 20px, 0); } to { opacity: 1; transform: translate3d(0, 0, 0); } }
+  .fade-up { animation: fadeUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) both; }
+  @media (prefers-reduced-motion: reduce) { .fade-up { animation: none; } }
 
-  /* Ambient aurora backdrop — pure CSS, no external image/WebGL dependency */
-  .aurora-bg { position: fixed; inset: 0; z-index: -1; overflow: hidden; background: #111317; }
-  .aurora-bg::before, .aurora-bg::after {
-    content: ""; position: absolute; width: 60vw; height: 60vw; max-width: 720px; max-height: 720px;
-    border-radius: 50%; filter: blur(90px); opacity: 0.28; will-change: transform;
-  }
-  .aurora-bg::before { background: radial-gradient(circle, #3b82f6, transparent 70%); top: -15%; left: -15%; animation: auroraA 34s ease-in-out infinite alternate; }
-  .aurora-bg::after { background: radial-gradient(circle, #10b981, transparent 70%); bottom: -20%; right: -10%; animation: auroraB 40s ease-in-out infinite alternate; }
-  @keyframes auroraA { from { transform: translate(0, 0); } to { transform: translate(8%, 12%); } }
-  @keyframes auroraB { from { transform: translate(0, 0); } to { transform: translate(-6%, -10%); } }
-  @media (prefers-reduced-motion: reduce) {
-    .aurora-bg::before, .aurora-bg::after { animation: none; }
-    .fade-up { animation: none; }
-  }
+  /* --- Per-step atmospheric background (Stitch's WebGL shader + photo) --- */
+  .step { position: relative; }
+  .step-atmosphere { position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 0; }
+  .step-atmosphere.fixed-atmosphere { position: fixed; }
+  .step-atmosphere canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .step-atmosphere img { position: absolute; inset: -5%; width: 110%; height: 110%; object-fit: cover; opacity: 0.3; will-change: transform; transform: translate3d(0,0,0) scale(1.05); transition: transform 0.6s cubic-bezier(0.16,1,0.3,1); }
+  .step-atmosphere::after { content: ""; position: absolute; inset: 0; background: linear-gradient(to bottom, rgba(17,19,23,0.2), rgba(17,19,23,0.75)); }
+  .step-content { position: relative; z-index: 10; }
 
   .glass-panel {
     background: rgba(17, 19, 23, 0.5);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
+    backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
     border: 1px solid transparent;
-    background-image: linear-gradient(rgba(17, 19, 23, 0.5), rgba(17, 19, 23, 0.5)),
-      linear-gradient(135deg, rgba(255,255,255,0.18) 0%, rgba(255,255,255,0.04) 100%);
-    background-origin: border-box;
-    background-clip: padding-box, border-box;
-    box-shadow: inset 0 1px 0 0 rgba(255,255,255,0.08), 0 4px 24px -8px rgba(0,0,0,0.5);
+    background-image: linear-gradient(rgba(17,19,23,0.5), rgba(17,19,23,0.5)), linear-gradient(135deg, rgba(255,255,255,0.2) 0%, rgba(255,255,255,0.05) 100%);
+    background-origin: border-box; background-clip: padding-box, border-box;
+    box-shadow: inset 0 1px 0 0 rgba(255,255,255,0.1), 0 4px 24px -8px rgba(0,0,0,0.5);
   }
 
   .glass-input {
-    background: rgba(0, 0, 0, 0.22);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    border: 1px solid rgba(255,255,255,0.1);
-    color: #e2e2e8;
-    transition: border-color 0.25s ease, box-shadow 0.25s ease;
+    background: rgba(0,0,0,0.2); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255,255,255,0.1); color: #e2e2e8;
+    transition: border-color 0.3s ease, box-shadow 0.3s ease;
   }
   .glass-input:focus, .glass-input:focus-within {
-    outline: none;
-    border-color: rgba(173, 198, 255, 0.5);
-    box-shadow: 0 0 20px rgba(173, 198, 255, 0.12), inset 0 0 15px rgba(173, 198, 255, 0.05);
+    outline: none; border-color: rgba(173,198,255,0.5);
+    box-shadow: 0 0 20px rgba(173,198,255,0.1), inset 0 0 15px rgba(173,198,255,0.05);
   }
-  .glass-input::placeholder { color: rgba(194, 198, 214, 0.45); }
+  .glass-input::placeholder { color: rgba(194,198,214,0.45); }
   input[type="checkbox"] { accent-color: #adc6ff; }
-  input[type="number"]::-webkit-inner-spin-button,
-  input[type="number"]::-webkit-outer-spin-button {
-    filter: invert(1) brightness(0.6);
-    opacity: 0.6;
-    cursor: pointer;
-  }
+  input[type="number"]::-webkit-inner-spin-button, input[type="number"]::-webkit-outer-spin-button { filter: invert(1) brightness(0.6); opacity: 0.6; }
 
   .glass-button-primary {
-    background: rgba(173, 198, 255, 0.16);
-    border: 1px solid rgba(173, 198, 255, 0.35);
-    box-shadow: 0 0 15px rgba(173, 198, 255, 0.18);
-    position: relative; overflow: hidden;
-    transition: box-shadow 0.3s ease, background 0.3s ease;
+    background: rgba(173,198,255,0.15); backdrop-filter: blur(10px);
+    border: 1px solid rgba(173,198,255,0.3); box-shadow: 0 0 15px rgba(173,198,255,0.2);
+    position: relative; overflow: hidden; transition: all 0.3s ease;
   }
   .glass-button-primary::before {
     content: ""; position: absolute; top: 0; left: -100%; width: 50%; height: 100%;
     background: linear-gradient(to right, transparent, rgba(255,255,255,0.2), transparent);
     transform: skewX(-25deg); transition: left 0.5s ease;
   }
-  .glass-button-primary:hover:not(:disabled) { box-shadow: 0 0 25px rgba(173, 198, 255, 0.3); background: rgba(173, 198, 255, 0.22); }
+  .glass-button-primary:hover:not(:disabled) { box-shadow: 0 0 25px rgba(173,198,255,0.3); }
   .glass-button-primary:hover:not(:disabled)::before { left: 200%; }
   .glass-button-primary:disabled { opacity: 0.5; cursor: not-allowed; }
 
   .glass-button {
-    background: rgba(255,255,255,0.06);
-    border: 1px solid rgba(255,255,255,0.14);
-    color: #e2e2e8;
-    transition: background 0.25s ease, color 0.25s ease, border-color 0.25s ease;
+    background: rgba(173,198,255,0.15); backdrop-filter: blur(10px);
+    border: 1px solid rgba(173,198,255,0.3); position: relative; overflow: hidden; transition: all 0.3s ease;
   }
-  .glass-button:hover:not(:disabled) { background: rgba(255,255,255,0.12); border-color: rgba(255,255,255,0.24); }
+  .glass-button::before {
+    content: ""; position: absolute; top: 0; left: -100%; width: 50%; height: 100%;
+    background: linear-gradient(to right, transparent, rgba(255,255,255,0.2), transparent);
+    transform: skewX(-20deg); transition: left 0.5s ease;
+  }
+  .glass-button:hover:not(:disabled)::before { left: 150%; }
+  .glass-button:hover:not(:disabled) { background: rgba(173,198,255,0.25); box-shadow: 0 0 20px rgba(173,198,255,0.2); }
   .glass-button:disabled { opacity: 0.5; cursor: not-allowed; }
 
-  .glass-toggle { background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.06); box-shadow: inset 0 2px 5px rgba(0,0,0,0.4); position: relative; }
+  .glass-toggle { background: rgba(0,0,0,0.3); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.05); box-shadow: inset 0 2px 5px rgba(0,0,0,0.5); position: relative; }
   .toggle-indicator {
-    position: absolute; top: 4px; left: 4px; bottom: 4px; width: calc(50% - 4px);
-    background: rgba(173, 198, 255, 0.2); border: 1px solid rgba(173, 198, 255, 0.4);
-    box-shadow: 0 2px 10px rgba(173, 198, 255, 0.15); border-radius: 9999px;
-    transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1); pointer-events: none;
+    position: absolute; top: 4px; left: 4px; bottom: 4px; width: calc(50% - 4px); z-index: 0;
+    background: rgba(173,198,255,0.2); border: 1px solid rgba(173,198,255,0.4);
+    box-shadow: 0 2px 10px rgba(173,198,255,0.15); border-radius: 9999px;
+    transition: transform 0.6s cubic-bezier(0.16,1,0.3,1);
   }
   .glass-toggle:has(#mode-dataset.active) .toggle-indicator { transform: translateX(100%); }
   .glass-toggle button { position: relative; z-index: 1; color: #c2c6d6; transition: color 0.3s ease; }
   .glass-toggle button.active { color: #adc6ff; }
 
-  details.filters summary { list-style: none; cursor: pointer; }
-  details.filters summary::-webkit-details-marker { display: none; }
-  details.filters[open] .chevron { transform: rotate(180deg); }
-  .chevron { transition: transform 0.3s ease; }
+  .glass-chip { background: rgba(173,198,255,0.1); backdrop-filter: blur(8px); border: 1px solid rgba(173,198,255,0.2); transition: all 0.3s ease; }
+  .glass-chip:hover { background: rgba(173,198,255,0.2); border-color: rgba(173,198,255,0.4); }
+  .glass-chip select, .glass-chip input {
+    background: transparent; border: none; color: #e2e2e8; outline: none;
+    font: inherit; width: 100%; text-align: center;
+  }
+  .glass-chip select option { background: #1e2024; color: #e2e2e8; }
 
-  .progress-bar-container { background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.1); border-radius: 9999px; overflow: hidden; height: 10px; position: relative; }
-  .progress-bar-fill { background: linear-gradient(90deg, #4f8cff, #33d69f); box-shadow: 0 0 16px 0 rgba(173,198,255,0.4); height: 100%; width: 0%; border-radius: 9999px; transition: width 0.4s cubic-bezier(0.4,0,0.2,1); position: relative; overflow: hidden; }
-  .progress-bar-fill .shimmer { position: absolute; top: 0; left: -100%; width: 50%; height: 100%; background: linear-gradient(to right, transparent, rgba(255,255,255,0.6), transparent); animation: shimmerSweep 2s infinite linear; }
+  .drawer-transition { transition: max-height 0.4s cubic-bezier(0.4,0,0.2,1), opacity 0.3s ease; }
+
+  .progress-bar-container { background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.1); overflow: hidden; position: relative; border-radius: 9999px; height: 6px; }
+  .progress-bar-fill { background: linear-gradient(90deg, #adc6ff 0%, #d8e2ff 100%); box-shadow: 0 0 20px 0 rgba(173,198,255,0.4); transition: width 0.3s cubic-bezier(0.4,0,0.2,1); position: relative; will-change: width; height: 100%; border-radius: 9999px; overflow: hidden; }
+  .shimmer { position: absolute; top: 0; left: -100%; width: 50%; height: 100%; background: linear-gradient(to right, transparent, rgba(255,255,255,0.5), transparent); animation: shimmerSweep 2s infinite linear; }
   @keyframes shimmerSweep { 100% { left: 200%; } }
-
-  .msg-box { border-radius: 12px; padding: 14px 16px; font-size: 13px; line-height: 1.5; }
-  .msg-box.error { background: rgba(255, 180, 171, 0.1); border: 1px solid rgba(255, 180, 171, 0.3); color: #ffb4ab; }
-  .msg-box.info { background: rgba(78, 222, 163, 0.1); border: 1px solid rgba(78, 222, 163, 0.3); color: #4edea3; }
+  .rolling-number-container { height: 1em; overflow: hidden; display: inline-block; vertical-align: top; }
+  .rolling-number-inner { display: flex; flex-direction: column; will-change: transform; }
+  #parse-error.error, #fetch-error.error { background: rgba(255,180,171,0.1); border: 1px solid rgba(255,180,171,0.3); color: #ffb4ab; }
+  #parse-error.info, #fetch-error.info { background: rgba(78,222,163,0.1); border: 1px solid rgba(78,222,163,0.3); color: #4edea3; }
 
   ::-webkit-scrollbar { width: 6px; }
   ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 9999px; }
-  ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.25); }
+  ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 9999px; }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }
 
-  /* --- Dynamically-rendered result cards (created by app.js) --- */
+  /* --- Results gallery (glass-card + masonry) --- */
   .masonry-grid { column-count: 1; column-gap: 16px; }
   @media (min-width: 640px) { .masonry-grid { column-count: 2; } }
   @media (min-width: 1024px) { .masonry-grid { column-count: 3; } }
+  @keyframes fadeInScale { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+  .masonry-item { break-inside: avoid; margin-bottom: 16px; animation: fadeInScale 0.6s cubic-bezier(0.16,1,0.3,1) both; }
 
-  @keyframes cardIn { from { opacity: 0; transform: scale(0.96); } to { opacity: 1; transform: scale(1); } }
-  .card {
-    display: block; break-inside: avoid; margin-bottom: 16px; position: relative;
-    background: rgba(30, 32, 36, 0.6);
-    backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+  .glass-card {
+    background: rgba(30,32,36,0.6); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
     border: 1px solid transparent;
-    background-image: linear-gradient(rgba(30,32,36,0.6), rgba(30,32,36,0.6)), linear-gradient(to bottom right, rgba(255,255,255,0.14), rgba(255,255,255,0.02));
+    background-image: linear-gradient(rgba(30,32,36,0.6), rgba(30,32,36,0.6)), linear-gradient(to bottom right, rgba(255,255,255,0.15), rgba(255,255,255,0.02));
     background-origin: border-box; background-clip: padding-box, border-box;
-    box-shadow: inset 0 1px 0 0 rgba(255,255,255,0.08);
-    border-radius: 12px; overflow: hidden; font-size: 12px;
-    transition: box-shadow 0.3s ease, transform 0.3s ease, opacity 0.3s ease, filter 0.3s ease;
-    animation: cardIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+    box-shadow: inset 0 1px 0 0 rgba(255,255,255,0.1); transition: all 0.3s ease;
   }
-  .card:hover { box-shadow: inset 0 1px 0 0 rgba(255,255,255,0.16), 0 0 20px 0 rgba(173,198,255,0.15); transform: translateY(-2px); }
-  .card img { width: 100%; height: 140px; object-fit: cover; display: block; background: #000; }
-  .card.discarded { opacity: 0.4; filter: grayscale(75%); transform: scale(0.98); }
-  .card.discarded:hover { transform: scale(0.98); }
-
-  .discard-btn {
-    position: absolute; top: 8px; right: 8px; z-index: 2;
-    background: rgba(17,19,23,0.75); backdrop-filter: blur(8px);
-    color: #e2e2e8; border: 1px solid rgba(255,255,255,0.14);
-    border-radius: 9999px; font-size: 11px; font-weight: 600;
-    padding: 5px 10px; cursor: pointer;
-    transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
-  }
-  .discard-btn:hover { background: rgba(255,180,171,0.25); border-color: rgba(255,180,171,0.5); color: #ffb4ab; }
-  .card.discarded .discard-btn { background: rgba(173,198,255,0.2); border-color: rgba(173,198,255,0.4); color: #adc6ff; }
-
-  .download-btn {
-    position: absolute; top: 8px; left: 8px; z-index: 2;
-    width: 26px; height: 26px; display: flex; align-items: center; justify-content: center;
-    background: rgba(17,19,23,0.7); backdrop-filter: blur(8px);
-    color: #e2e2e8; border: 1px solid rgba(255,255,255,0.12);
-    border-radius: 9999px; font-size: 12px; text-decoration: none;
-    transition: background 0.2s ease, color 0.2s ease;
-  }
-  .download-btn:hover { background: rgba(173,198,255,0.3); color: #adc6ff; }
-
-  .card .body { padding: 10px 12px 12px; }
-  .card .title { font-weight: 600; margin-bottom: 4px; max-height: 34px; overflow: hidden; color: #e2e2e8; }
-  .card .meta { color: #8c909f; font-size: 11px; }
-  .badge { display: inline-block; font-size: 10px; background: rgba(173,198,255,0.15); color: #adc6ff; padding: 2px 7px; border-radius: 9999px; margin-right: 4px; }
+  .glass-card:hover { box-shadow: inset 0 1px 0 0 rgba(255,255,255,0.2), 0 0 20px 0 rgba(173,198,255,0.15); transform: translateY(-2px); }
+  .glass-card.discarded { opacity: 0.4; filter: grayscale(80%); transform: scale(0.98); }
+  .glass-card.discarded:hover { transform: scale(0.98); }
+  .glass-card.discarded .discard-btn { opacity: 1 !important; background: rgba(173,198,255,0.2); border-color: rgba(173,198,255,0.4); color: #adc6ff; }
+  .discard-btn { opacity: 0; }
+  .group:hover .discard-btn { opacity: 1; }
+  .line-clamp-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .line-clamp-3 { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 </style>
 </head>
-<body class="text-on-surface antialiased overflow-x-hidden min-h-screen relative">
-<div class="aurora-bg" aria-hidden="true"></div>
+<body class="text-on-surface antialiased overflow-x-hidden min-h-screen">
 
-<header class="glass-panel flex items-center gap-3 px-6 py-4 mx-4 mt-4 rounded-xl md:mx-auto md:max-w-max-width fade-up">
-  <img src="/logo.svg" alt="Distillery logo" class="w-8 h-8 flex-shrink-0">
-  <div class="flex items-baseline gap-3 flex-wrap">
-    <h1 class="text-title-md font-semibold text-primary tracking-tight">Distillery</h1>
-    <span class="text-body-sm text-on-surface-variant opacity-80">distill web data into a labeled ML dataset from a plain-English condition</span>
-  </div>
-</header>
-
-<main class="w-full max-w-max-width mx-auto px-gutter py-margin-page flex flex-col gap-stack-lg relative z-10">
-
-  <!-- Condition input -->
-  <section class="glass-panel rounded-xl p-padding-panel flex flex-col gap-stack-md fade-up" style="animation-delay:0.05s">
-    <div class="glass-input rounded-lg relative overflow-hidden">
-      <label class="sr-only" for="condition">Describe what you want in plain English</label>
-      <textarea id="condition" class="w-full h-28 bg-transparent border-none text-on-surface text-body-lg p-4 focus:ring-0 relative z-10 block resize-none"></textarea>
-      <div id="placeholder-overlay" class="absolute inset-0 pointer-events-none p-4 text-body-lg text-on-surface-variant/50 z-0">
-        <span id="typewriter"></span>
-      </div>
+<!-- ============================================================ -->
+<!-- STEP 1 — Condition input                                     -->
+<!-- ============================================================ -->
+<section class="step">
+  <div class="step-atmosphere" id="atmo-1"><canvas></canvas><img alt="" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAlfEm24YHgG9Pe9mXxDnoZommWjp5BCB0f7Wq7m1raXvV8iQEIlo4W8rTckiPt6kIfQAoQehS9C3hmD8N0UfSRnIWaEZHEFedypEM0A_Rw350Nki9R1DZB9FgB-ckoxE935BBmByiEVXP773aJnBs1dF8fAKpuKVBCmNJHdcb812InJGSaffQ1WPaCh6o_TbKse69cX2kSR8Xy7fqZjGgY3d9Ie_C_zLoOYKwoUxKd9Xyc-tybug93SQ"></div>
+  <main class="step-content w-full max-w-max-width mx-auto px-gutter py-margin-page flex flex-col items-center">
+    <div class="mb-stack-lg fade-up text-center flex items-center gap-3 justify-center">
+      <img src="/logo.svg" alt="" class="w-10 h-10 md:w-12 md:h-12">
+      <h1 class="font-display-lg text-display-lg text-primary tracking-tighter drop-shadow-[0_0_15px_rgba(173,198,255,0.3)]">Distillery</h1>
     </div>
+    <p class="text-body-lg text-on-surface-variant -mt-4 mb-stack-lg opacity-80 fade-up" style="animation-delay:0.1s">distill web data into a labeled ML dataset from a plain-English condition</p>
 
-    <div class="flex flex-col md:flex-row justify-between items-center gap-stack-md">
-      <div class="glass-toggle rounded-full p-1 flex items-center w-full md:w-auto h-11">
-        <div class="toggle-indicator"></div>
-        <button type="button" id="mode-preview" class="active flex-1 md:w-36 h-full text-label-caps uppercase tracking-wide">Quick preview</button>
-        <button type="button" id="mode-dataset" class="flex-1 md:w-36 h-full text-label-caps uppercase tracking-wide">Build dataset</button>
-      </div>
-      <div class="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 w-full md:w-auto sm:justify-end">
-        <span id="parse-status" class="text-body-sm text-on-surface-variant order-2 sm:order-1 sm:text-right"></span>
-        <button type="button" id="parse-btn" class="glass-button-primary rounded-full px-6 py-3 text-label-caps uppercase tracking-wide text-primary-fixed whitespace-nowrap flex-shrink-0 order-1 sm:order-2">Parse condition</button>
-      </div>
-    </div>
-    <div id="parse-error" class="msg-box error hidden"></div>
-  </section>
-
-  <!-- Parsed filters -->
-  <section id="filters-panel" class="glass-panel rounded-xl p-padding-panel flex flex-col gap-stack-md hidden fade-up">
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-stack-md">
-      <div class="flex flex-col gap-2">
-        <label class="text-label-caps uppercase text-outline" for="f-data-type">Data type</label>
-        <select id="f-data-type" class="glass-input rounded-lg px-3 py-2 text-body-sm appearance-none w-full">
-          <option value="image">image</option>
-          <option value="text">text</option>
-          <option value="structured">structured</option>
-        </select>
-      </div>
-      <div class="flex flex-col gap-2">
-        <label class="text-label-caps uppercase text-outline" for="f-count">Count</label>
-        <input type="number" id="f-count" min="1" max="1000" class="glass-input rounded-lg px-3 py-2 text-body-sm w-full">
-      </div>
-      <div class="flex flex-col gap-2">
-        <label class="text-label-caps uppercase text-outline" for="f-label">Dataset label</label>
-        <input type="text" id="f-label" class="glass-input rounded-lg px-3 py-2 text-body-sm w-full">
-      </div>
-    </div>
-    <div class="flex flex-col gap-2">
-      <label class="text-label-caps uppercase text-outline" for="f-keywords">Keywords (comma separated)</label>
-      <input type="text" id="f-keywords" class="glass-input rounded-lg px-3 py-2 text-body-sm w-full">
-    </div>
-
-    <details class="filters">
-      <summary class="flex items-center justify-between py-2 text-on-surface-variant hover:text-primary transition-colors">
-        <span class="text-label-caps uppercase tracking-wide flex items-center gap-2">
-          <span class="material-symbols-outlined text-[18px]">tune</span>
-          Advanced filters (power users)
-        </span>
-        <span class="material-symbols-outlined chevron">expand_more</span>
-      </summary>
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-stack-md mt-stack-md bg-black/15 rounded-lg p-stack-md border border-white/5">
-        <div class="flex flex-col gap-2">
-          <label class="text-label-caps uppercase text-outline" for="f-resolution">Resolution</label>
-          <select id="f-resolution" class="glass-input rounded-lg px-3 py-2 text-body-sm appearance-none w-full">
-            <option value="">any</option>
-            <option value="low">low</option>
-            <option value="medium">medium</option>
-            <option value="high">high</option>
-          </select>
+    <div class="w-full max-w-3xl glass-panel rounded-xl p-padding-panel flex flex-col gap-stack-md fade-up" style="animation-delay:0.2s">
+      <div class="glass-input rounded-lg relative overflow-hidden group">
+        <label class="sr-only" for="condition">Describe what you want in plain English</label>
+        <textarea id="condition" class="w-full h-36 bg-transparent border-none text-on-surface text-body-lg p-stack-md focus:ring-0 z-10 relative block resize-none"></textarea>
+        <div class="absolute inset-0 pointer-events-none p-stack-md text-body-lg text-on-surface-variant/50" id="placeholder-overlay">
+          <span id="typewriter"></span>
         </div>
-        <div class="flex flex-col gap-2">
-          <label class="text-label-caps uppercase text-outline" for="f-orientation">Orientation</label>
-          <select id="f-orientation" class="glass-input rounded-lg px-3 py-2 text-body-sm appearance-none w-full">
-            <option value="">any</option>
-            <option value="landscape">landscape</option>
-            <option value="portrait">portrait</option>
-            <option value="square">square</option>
-          </select>
+      </div>
+      <div class="flex flex-col md:flex-row justify-between items-center gap-stack-md">
+        <div class="glass-toggle rounded-full p-1 flex items-center w-full md:w-auto h-12">
+          <div class="toggle-indicator"></div>
+          <button type="button" id="mode-preview" class="active flex-1 md:w-40 h-full text-label-caps uppercase">Quick preview</button>
+          <button type="button" id="mode-dataset" class="flex-1 md:w-40 h-full text-label-caps uppercase">Build dataset</button>
         </div>
-        <div class="flex flex-col gap-2">
-          <label class="text-label-caps uppercase text-outline" for="f-language">Language</label>
-          <input type="text" id="f-language" placeholder="en" class="glass-input rounded-lg px-3 py-2 text-body-sm w-full">
+        <button type="button" id="parse-btn" class="w-full md:w-auto glass-button-primary rounded-full px-8 py-3 flex items-center justify-center gap-2 group flex-shrink-0">
+          <span class="text-label-caps uppercase text-primary-fixed tracking-wider">Parse condition</span>
+          <span class="material-symbols-outlined text-primary-fixed group-hover:translate-x-1 transition-transform">arrow_forward</span>
+        </button>
+      </div>
+      <div class="flex justify-between items-center">
+        <span id="parse-status" class="text-body-sm text-on-surface-variant"></span>
+      </div>
+      <div id="parse-error" class="rounded-lg p-4 hidden">
+        <p class="text-body-sm"></p>
+      </div>
+    </div>
+
+    <div class="mt-stack-lg fade-up text-center flex items-center gap-2 justify-center glass-panel rounded-full px-4 py-2 opacity-70" style="animation-delay:0.3s">
+      <span class="w-2 h-2 rounded-full bg-secondary shadow-[0_0_8px_rgba(78,222,163,0.8)]"></span>
+      <span class="text-body-sm text-on-surface-variant">Ready</span>
+    </div>
+  </main>
+</section>
+
+<!-- ============================================================ -->
+<!-- STEP 2 — Review parameters / parsed filters                  -->
+<!-- ============================================================ -->
+<section class="step hidden" id="filters-panel">
+  <div class="step-atmosphere" id="atmo-2"><canvas></canvas><img alt="" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDavaSIZJgH3J5Wupg5NmsDODH5zA161YmaRpjYWi9yiL6wFaSDUtse_u5WirBvA7hyXSehDDwDYWN_FWT5qbrDmuLRssKZoq6vkR5gHJ7PlHROngMsjBmd59RNvVfCwgoeUUgf3ihNIc-mVei_emz6hI-NIiXoQ4sPsm7WFnHlCJSrP7lIcPs0oZigItc9Rf60LRgOZ-pZ9INvwrKm4ErVkn4Vd6IjhCciFIIJkA8aCsM49wkayJ7Ntg"></div>
+  <main class="step-content w-full max-w-max-width mx-auto px-gutter py-margin-page flex flex-col justify-center">
+    <header class="mb-stack-lg text-center fade-up">
+      <h1 class="font-headline-lg text-headline-lg text-primary mb-stack-sm">Review parameters</h1>
+      <p class="text-body-lg text-on-surface-variant">We've extracted the following intent from your request. Adjust as needed before fetching data.</p>
+    </header>
+    <div class="glass-panel rounded-xl p-padding-panel flex flex-col gap-stack-lg fade-up" style="animation-delay:0.1s">
+      <div>
+        <h2 class="text-title-md text-on-surface mb-stack-md flex items-center gap-2">
+          <span class="material-symbols-outlined text-primary" style="font-variation-settings:'FILL' 1;">auto_awesome</span>
+          Parsed filters
+        </h2>
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-stack-sm">
+          <label class="glass-chip rounded-full px-4 py-2 flex items-center gap-2">
+            <span class="material-symbols-outlined text-primary text-[18px]">image</span>
+            <select id="f-data-type" aria-label="Data type">
+              <option value="image">image</option>
+              <option value="text">text</option>
+              <option value="structured">structured</option>
+            </select>
+          </label>
+          <label class="glass-chip rounded-full px-4 py-2 flex items-center gap-2">
+            <span class="material-symbols-outlined text-primary text-[18px]">format_list_numbered</span>
+            <input type="number" id="f-count" min="1" max="1000" aria-label="Count" title="Count">
+          </label>
+          <label class="glass-chip rounded-full px-4 py-2 flex items-center gap-2">
+            <span class="material-symbols-outlined text-primary text-[18px]">sell</span>
+            <input type="text" id="f-label" placeholder="dataset label" aria-label="Dataset label">
+          </label>
         </div>
-        <div class="flex flex-col gap-2">
-          <label class="text-label-caps uppercase text-outline">Date range</label>
-          <div class="flex items-center gap-2">
-            <input type="text" id="f-date-from" placeholder="YYYY-MM-DD" class="glass-input rounded-lg px-3 py-2 text-body-sm w-full">
-            <span class="text-outline">-</span>
-            <input type="text" id="f-date-to" placeholder="YYYY-MM-DD" class="glass-input rounded-lg px-3 py-2 text-body-sm w-full">
+        <label class="glass-chip rounded-lg px-4 py-2 mt-stack-sm flex items-center gap-2">
+          <span class="material-symbols-outlined text-primary text-[18px]">key</span>
+          <input type="text" id="f-keywords" placeholder="keywords, comma separated" class="!text-left" aria-label="Keywords, comma separated">
+        </label>
+      </div>
+
+      <div class="h-[1px] w-full bg-gradient-to-r from-transparent via-white/10 to-transparent"></div>
+
+      <div>
+        <button type="button" class="w-full flex items-center justify-between py-2 text-on-surface-variant hover:text-primary transition-colors focus:outline-none" id="drawer-toggle">
+          <span class="text-label-caps uppercase tracking-wider flex items-center gap-2">
+            <span class="material-symbols-outlined text-[18px]">tune</span>
+            Advanced filters (power users)
+          </span>
+          <span class="material-symbols-outlined transition-transform duration-300" id="drawer-icon">expand_more</span>
+        </button>
+        <div class="drawer-transition max-h-0 opacity-0 overflow-hidden mt-stack-md" id="advanced-drawer">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-stack-md bg-surface/20 rounded-lg p-stack-md border border-white/5">
+            <div class="flex flex-col gap-2">
+              <label class="text-label-caps uppercase text-outline" for="f-resolution">Resolution</label>
+              <select id="f-resolution" class="glass-input rounded-md px-3 py-2 text-body-sm w-full">
+                <option value="">any</option>
+                <option value="low">low</option>
+                <option value="medium">medium</option>
+                <option value="high">high</option>
+              </select>
+            </div>
+            <div class="flex flex-col gap-2">
+              <label class="text-label-caps uppercase text-outline">Date created</label>
+              <div class="flex items-center gap-2">
+                <input class="glass-input rounded-md px-3 py-2 text-body-sm w-full" id="f-date-from" placeholder="YYYY-MM-DD" type="text">
+                <span class="text-outline-variant">-</span>
+                <input class="glass-input rounded-md px-3 py-2 text-body-sm w-full" id="f-date-to" placeholder="YYYY-MM-DD" type="text">
+              </div>
+            </div>
+            <div class="flex flex-col gap-2">
+              <label class="text-label-caps uppercase text-outline" for="f-language">Language</label>
+              <input class="glass-input rounded-md px-3 py-2 text-body-sm w-full" id="f-language" placeholder="en" type="text">
+            </div>
+            <div class="flex flex-col gap-2">
+              <label class="text-label-caps uppercase text-outline" for="f-domains">Domain allowlist</label>
+              <input class="glass-input rounded-md px-3 py-2 text-body-sm w-full" id="f-domains" placeholder="example.com, another.org" type="text">
+            </div>
+            <div class="flex flex-col gap-3 md:col-span-2">
+              <label class="text-label-caps uppercase text-outline">Orientation</label>
+              <div class="flex flex-wrap gap-4">
+                <label class="flex items-center gap-2 cursor-pointer group">
+                  <input checked class="peer sr-only" name="orientation" type="radio" value="">
+                  <div class="w-4 h-4 rounded-full border border-outline-variant peer-checked:border-primary peer-checked:bg-primary/20 flex items-center justify-center transition-all group-hover:border-primary/50">
+                    <div class="w-2 h-2 rounded-full bg-primary scale-0 peer-checked:scale-100 transition-transform"></div>
+                  </div>
+                  <span class="text-body-sm text-on-surface-variant peer-checked:text-on-surface">Any</span>
+                </label>
+                <label class="flex items-center gap-2 cursor-pointer group">
+                  <input class="peer sr-only" name="orientation" type="radio" value="landscape">
+                  <div class="w-4 h-4 rounded-full border border-outline-variant peer-checked:border-primary peer-checked:bg-primary/20 flex items-center justify-center transition-all group-hover:border-primary/50">
+                    <div class="w-2 h-2 rounded-full bg-primary scale-0 peer-checked:scale-100 transition-transform"></div>
+                  </div>
+                  <span class="text-body-sm text-on-surface-variant peer-checked:text-on-surface">Landscape</span>
+                </label>
+                <label class="flex items-center gap-2 cursor-pointer group">
+                  <input class="peer sr-only" name="orientation" type="radio" value="portrait">
+                  <div class="w-4 h-4 rounded-full border border-outline-variant peer-checked:border-primary peer-checked:bg-primary/20 flex items-center justify-center transition-all group-hover:border-primary/50">
+                    <div class="w-2 h-2 rounded-full bg-primary scale-0 peer-checked:scale-100 transition-transform"></div>
+                  </div>
+                  <span class="text-body-sm text-on-surface-variant peer-checked:text-on-surface">Portrait</span>
+                </label>
+                <label class="flex items-center gap-2 cursor-pointer group">
+                  <input class="peer sr-only" name="orientation" type="radio" value="square">
+                  <div class="w-4 h-4 rounded-full border border-outline-variant peer-checked:border-primary peer-checked:bg-primary/20 flex items-center justify-center transition-all group-hover:border-primary/50">
+                    <div class="w-2 h-2 rounded-full bg-primary scale-0 peer-checked:scale-100 transition-transform"></div>
+                  </div>
+                  <span class="text-body-sm text-on-surface-variant peer-checked:text-on-surface">Square</span>
+                </label>
+              </div>
+              <select id="f-orientation" class="hidden"><option value="">any</option><option value="landscape">landscape</option><option value="portrait">portrait</option><option value="square">square</option></select>
+            </div>
+            <label class="flex items-center gap-2 cursor-pointer md:col-span-2">
+              <input type="checkbox" id="f-no-watermark" class="w-4 h-4">
+              <span class="text-body-sm text-on-surface-variant">No watermarks</span>
+            </label>
+            <label class="flex items-start gap-2 cursor-pointer md:col-span-2">
+              <input type="checkbox" id="f-dedupe-across-runs" class="w-4 h-4 mt-0.5">
+              <span class="text-body-sm text-on-surface-variant">Skip anything I've ever fetched before, in any run (off by default — a repeated/refined query can otherwise return far fewer results, since sources return the same top matches each time)</span>
+            </label>
           </div>
         </div>
-        <div class="flex flex-col gap-2 md:col-span-2">
-          <label class="text-label-caps uppercase text-outline" for="f-domains">Domain allowlist (comma separated, narrows scraper fallback only)</label>
-          <input type="text" id="f-domains" placeholder="example.com, another.org" class="glass-input rounded-lg px-3 py-2 text-body-sm w-full">
-        </div>
-        <label class="flex items-center gap-2 cursor-pointer md:col-span-2">
-          <input type="checkbox" id="f-no-watermark" class="w-4 h-4">
-          <span class="text-body-sm text-on-surface-variant">No watermarks</span>
-        </label>
-        <label class="flex items-start gap-2 cursor-pointer md:col-span-2">
-          <input type="checkbox" id="f-dedupe-across-runs" class="w-4 h-4 mt-0.5">
-          <span class="text-body-sm text-on-surface-variant">Skip anything I've ever fetched before, in any run (off by default — a repeated/refined query can otherwise return far fewer results, since sources return the same top matches each time)</span>
-        </label>
       </div>
-    </details>
 
-    <div class="flex justify-end mt-stack-sm">
-      <button type="button" id="fetch-btn" class="glass-button-primary rounded-full px-8 py-3 text-title-md text-primary-fixed flex items-center gap-2">
-        Start fetch
-        <span class="material-symbols-outlined text-[20px]">rocket_launch</span>
-      </button>
+      <div class="mt-stack-md flex justify-end">
+        <button type="button" id="fetch-btn" class="glass-button-primary rounded-full px-8 py-3 text-title-md text-primary flex items-center gap-2 focus:outline-none">
+          Start fetch
+          <span class="material-symbols-outlined text-[20px]" style="font-variation-settings:'FILL' 1;">rocket_launch</span>
+        </button>
+      </div>
     </div>
-  </section>
+  </main>
+</section>
 
-  <!-- Live fetch progress -->
-  <section id="progress-panel" class="glass-panel rounded-xl p-padding-panel flex flex-col gap-stack-md hidden fade-up">
-    <div class="flex justify-between items-center">
-      <span id="progress-label" class="text-body-sm text-primary">Fetching...</span>
-      <span id="progress-count" class="text-title-md font-code">0 / 0</span>
-    </div>
-    <div class="progress-bar-container">
-      <div id="progress-bar" class="progress-bar-fill"><div class="shimmer"></div></div>
-    </div>
-    <div class="flex justify-center">
-      <button type="button" id="stop-btn" class="glass-button rounded-full px-6 py-2.5 text-body-sm flex items-center gap-2 hidden">
-        <span class="material-symbols-outlined text-[18px]">stop_circle</span>
-        Stop fetch
-      </button>
-    </div>
-    <div id="fetch-error" class="msg-box hidden"></div>
-  </section>
-
-  <!-- Results -->
-  <section id="results-panel" class="flex flex-col gap-stack-md hidden fade-up">
-    <div class="glass-panel rounded-full px-6 py-3 flex flex-wrap items-center justify-between gap-3">
-      <span id="results-summary" class="text-body-sm text-on-surface-variant"></span>
-      <button type="button" id="topup-btn" class="glass-button rounded-full px-5 py-2 text-label-caps uppercase tracking-wide text-primary hidden"></button>
-    </div>
-
-    <div id="results-grid" class="masonry-grid"></div>
-
-    <div id="export-section" class="glass-panel rounded-xl p-padding-panel hidden flex flex-col gap-stack-md">
-      <div class="grid grid-cols-2 md:grid-cols-5 gap-stack-md items-end">
-        <div class="flex flex-col gap-2">
-          <label class="text-label-caps uppercase text-outline">Train %</label>
-          <input type="number" id="split-train" value="80" class="glass-input rounded-lg px-3 py-2 text-body-sm w-full">
+<!-- ============================================================ -->
+<!-- STEP 3 — Live fetch                                          -->
+<!-- ============================================================ -->
+<section class="step hidden" id="progress-panel">
+  <div class="step-atmosphere" id="atmo-3"><canvas></canvas><img alt="" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBgIlDPyUmsg37BHpjfvRu1tu4HhZLx5HVKC1XoNS7F6zQQc6d7Apt4Ks9FP6Wa4X3ZwFzqP1wbCCd4pLORwV_d3QmqBNGLUTlY79c_YPNvyJR1euOhZgSsBaLTf7mHEE7XSZ71XrY-ME-LhjpUX1_yol8QxsoOAdqPB4eC5nNUGzD-osVqGdDZcz4t_sDZXAAF1oy5bXRRxRfYZJfMHM8lnxK7LytbzIwjyF8j2QWeqvY_cGXOO4Ls0g"></div>
+  <main class="step-content w-full max-w-max-width mx-auto px-gutter py-margin-page flex flex-col items-center">
+    <div class="glass-panel w-full max-w-md rounded-2xl p-padding-panel flex flex-col gap-stack-lg shadow-2xl fade-up">
+      <div class="flex flex-col items-center text-center gap-stack-sm mb-2">
+        <div class="w-12 h-12 rounded-full glass-panel flex items-center justify-center mb-4 shadow-[0_0_20px_rgba(173,198,255,0.2)]">
+          <span class="material-symbols-outlined text-primary">autorenew</span>
         </div>
-        <div class="flex flex-col gap-2">
-          <label class="text-label-caps uppercase text-outline">Val %</label>
-          <input type="number" id="split-val" value="10" class="glass-input rounded-lg px-3 py-2 text-body-sm w-full">
+        <h1 class="font-headline-lg text-headline-lg text-on-surface tracking-tighter">Fetching data</h1>
+        <p id="progress-label" class="text-body-sm text-primary">Starting...</p>
+      </div>
+      <div class="flex flex-col gap-stack-md w-full px-2">
+        <div class="flex justify-between items-end mb-1">
+          <span class="text-label-caps text-outline-variant uppercase">Progress</span>
+          <div class="text-title-md text-on-surface font-medium flex items-center gap-2 font-code">
+            <span class="rolling-number-container">
+              <span class="rolling-number-inner" id="counter-inner-current"><span>0</span><span>0</span></span>
+            </span>
+            <span class="text-outline">/</span>
+            <span id="progress-target">0</span>
+          </div>
         </div>
-        <div class="flex flex-col gap-2">
-          <label class="text-label-caps uppercase text-outline">Test %</label>
-          <input type="number" id="split-test" value="10" class="glass-input rounded-lg px-3 py-2 text-body-sm w-full">
-        </div>
-        <div class="flex flex-col gap-2">
-          <label class="text-label-caps uppercase text-outline">Resize W</label>
-          <input type="number" id="resize-w" placeholder="e.g. 256" class="glass-input rounded-lg px-3 py-2 text-body-sm w-full">
-        </div>
-        <div class="flex flex-col gap-2">
-          <label class="text-label-caps uppercase text-outline">Resize H</label>
-          <input type="number" id="resize-h" placeholder="e.g. 256" class="glass-input rounded-lg px-3 py-2 text-body-sm w-full">
+        <div class="progress-bar-container">
+          <div class="progress-bar-fill" id="progress-bar"><div class="shimmer"></div></div>
         </div>
       </div>
-      <div class="flex flex-wrap items-center justify-between gap-3 mt-stack-sm">
+      <div id="fetch-error" class="rounded-lg p-4 flex items-start gap-4 hidden">
+        <span class="material-symbols-outlined text-[20px] mt-0.5">warning</span>
+        <p class="text-body-sm flex-1 leading-relaxed"></p>
+      </div>
+      <div class="pt-stack-sm flex justify-center mt-2 mb-2">
+        <button type="button" id="stop-btn" class="glass-panel px-8 py-3 rounded-full text-body-sm text-outline hover:text-on-surface hover:bg-white/5 transition-all duration-300 flex items-center gap-2 active:scale-95 group hidden">
+          <span class="material-symbols-outlined text-[20px] group-hover:text-error transition-colors">stop_circle</span>
+          Stop fetch
+        </button>
+      </div>
+    </div>
+  </main>
+</section>
+
+<!-- ============================================================ -->
+<!-- STEP 4 — Results gallery + export builder                    -->
+<!-- ============================================================ -->
+<section class="step hidden" id="results-panel">
+  <div class="step-atmosphere fixed-atmosphere" id="atmo-4"><canvas></canvas><img alt="" src="https://lh3.googleusercontent.com/aida/AEtjO1WzT2WDbmvoxOP4QpoddUlnTASPN1hvNniBsVNjOAp3zu8iiLiholV0JeZmIJlBWDDwlcX4EE_dqRniKIBh7iQH8A6wNLQtVl5opx0BkBqALuAfoFWksiOV3Vz8jJternUrE7tpOTeXbsOGUVacXgdq30--hYCx7U58GyMQQEXzzCDhQ_xP4lJE4rQtTQnMlRQGx4TYDnahQi_HLzsHX8Dm4wABN5if7NsJlwKXhMCREMM1jnVzDjkl7EMQ"></div>
+
+  <nav class="step-content sticky top-0 z-30 bg-surface/30 backdrop-blur-md border-b border-white/10">
+    <div class="flex justify-between items-center h-16 px-gutter max-w-max-width mx-auto">
+      <div class="flex items-center gap-2">
+        <img src="/logo.svg" alt="" class="w-6 h-6">
+        <span class="font-headline-lg text-title-md font-bold tracking-tighter text-primary">Distillery</span>
+      </div>
+      <div class="flex items-center gap-2">
+        <button type="button" class="text-on-surface-variant hover:text-primary transition-colors p-2 rounded-full hover:bg-white/10 active:scale-95" title="Not wired up yet — informational only">
+          <span class="material-symbols-outlined">settings</span>
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <main class="step-content pt-stack-lg pb-40 px-gutter max-w-max-width mx-auto w-full">
+    <header class="mb-stack-lg flex flex-col md:flex-row md:items-end justify-between gap-stack-md">
+      <div>
+        <h1 class="font-display-lg text-headline-lg text-on-surface mb-stack-sm">Results gallery</h1>
+        <p id="results-heading-sub" class="text-body-lg text-on-surface-variant"></p>
+      </div>
+    </header>
+
+    <div id="results-summary" class="hidden"></div>
+    <div class="masonry-grid" id="results-grid"></div>
+
+    <!-- Fixed summary footer (kept / discarded / target + mini progress + top-up) -->
+    <div class="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 w-[calc(100%-32px)] max-w-[620px] flex flex-col sm:flex-row justify-center items-center gap-3">
+      <div class="glass-panel rounded-full px-6 py-3 flex items-center gap-4 flex-wrap justify-center w-full sm:w-auto">
+        <div class="flex items-center gap-2 flex-wrap justify-center">
+          <span id="kept-count" class="text-label-caps text-secondary">0 KEPT</span>
+          <span class="text-outline-variant">·</span>
+          <span id="discarded-count" class="text-label-caps text-outline">0 DISCARDED</span>
+          <span class="text-outline-variant">·</span>
+          <span id="target-count" class="text-label-caps text-primary">TARGET 0</span>
+        </div>
+        <div class="h-4 w-px bg-white/10 hidden sm:block"></div>
+        <div class="w-24 h-1.5 bg-surface-container-high rounded-full overflow-hidden">
+          <div class="h-full bg-primary" id="mini-progress-fill" style="width:0%"></div>
+        </div>
+      </div>
+      <button type="button" id="topup-btn" class="glass-button rounded-full px-6 py-3 text-label-caps text-primary flex items-center gap-2 whitespace-nowrap shadow-[0_0_15px_rgba(173,198,255,0.1)] hidden">
+        <span class="material-symbols-outlined text-[18px]">add_circle</span>
+        <span id="topup-label"></span>
+      </button>
+    </div>
+
+    <!-- Export builder -->
+    <div id="export-section" class="glass-panel rounded-xl p-padding-panel mt-stack-lg flex flex-col gap-stack-lg hidden">
+      <h2 class="text-headline-lg font-semibold text-primary text-center md:text-left">Dataset builder</h2>
+      <div class="flex items-center gap-4 p-4 rounded-lg bg-surface-container-high/30 border border-white/5">
+        <div class="w-12 h-12 rounded-lg bg-primary/20 flex items-center justify-center text-primary">
+          <span class="material-symbols-outlined">dataset</span>
+        </div>
+        <div>
+          <h3 id="export-dataset-name" class="text-title-md text-on-surface">dataset</h3>
+          <p id="export-dataset-meta" class="text-body-sm text-on-surface-variant"></p>
+        </div>
+      </div>
+
+      <div class="space-y-stack-md">
+        <label class="text-label-caps text-outline uppercase tracking-widest block">Image resize (optional)</label>
+        <div class="grid grid-cols-2 gap-4">
+          <input class="glass-input w-full rounded-lg px-3 py-2 font-code text-code text-on-surface focus:ring-0" type="number" id="resize-w" placeholder="width px">
+          <input class="glass-input w-full rounded-lg px-3 py-2 font-code text-code text-on-surface focus:ring-0" type="number" id="resize-h" placeholder="height px">
+        </div>
+      </div>
+
+      <div class="h-px w-full bg-white/5"></div>
+
+      <div class="space-y-stack-md">
+        <label class="text-label-caps text-outline uppercase tracking-widest block">Data split</label>
+        <div class="space-y-6">
+          <div class="space-y-2">
+            <div class="flex justify-between font-code text-code"><span class="text-primary">Train</span><span class="text-on-surface" id="train-val">80%</span></div>
+            <input class="w-full" id="split-train" max="100" min="0" type="range" value="80">
+          </div>
+          <div class="grid grid-cols-2 gap-6">
+            <div class="space-y-2">
+              <div class="flex justify-between font-code text-code"><span class="text-tertiary">Val</span><span class="text-on-surface" id="val-val">10%</span></div>
+              <input class="w-full" id="split-val" max="100" min="0" type="range" value="10">
+            </div>
+            <div class="space-y-2">
+              <div class="flex justify-between font-code text-code"><span class="text-secondary">Test</span><span class="text-on-surface" id="test-val">10%</span></div>
+              <input class="w-full" id="split-test" max="100" min="0" type="range" value="10">
+            </div>
+          </div>
+        </div>
+        <div class="h-2 w-full rounded-full overflow-hidden flex border border-white/5">
+          <div class="h-full bg-primary" id="vis-train" style="width:80%"></div>
+          <div class="h-full bg-tertiary" id="vis-val" style="width:10%"></div>
+          <div class="h-full bg-secondary" id="vis-test" style="width:10%"></div>
+        </div>
+      </div>
+
+      <div class="space-y-stack-md">
+        <label class="text-label-caps text-outline uppercase tracking-widest block">Format</label>
+        <span class="inline-block px-4 py-1.5 rounded-full bg-primary/20 text-primary border border-primary/30 text-body-sm w-fit" title="The only format this build currently produces">COCO</span>
+      </div>
+
+      <div class="flex flex-col sm:flex-row justify-between items-center gap-3 mt-2">
         <span id="export-status" class="text-body-sm text-on-surface-variant"></span>
-        <button type="button" id="export-btn" class="glass-button-primary rounded-full px-8 py-3 text-title-md text-primary-fixed flex items-center gap-2">
-          <span class="material-symbols-outlined text-[20px]">download</span>
+        <button type="button" id="export-btn" class="glass-button font-title-md text-title-md text-primary-fixed px-8 py-4 rounded-full flex items-center gap-2 w-full sm:w-auto justify-center group flex-shrink-0">
+          <span class="material-symbols-outlined transition-transform group-hover:-translate-y-1">download</span>
           Download dataset (.zip)
         </button>
       </div>
     </div>
-  </section>
+  </main>
 
-</main>
-
-<footer class="text-center text-on-surface-variant text-body-sm opacity-70 py-10 px-4">
-  Local tool — respects robots.txt and each API's rate limits. Check per-item license/attribution before training use.
-</footer>
+  <footer class="step-content w-full py-stack-lg border-t border-white/5 bg-transparent">
+    <div class="flex flex-col sm:flex-row justify-between max-w-max-width mx-auto px-gutter items-center gap-2 text-center sm:text-left">
+      <div class="text-label-caps uppercase text-outline" id="footer-year"></div>
+      <div class="text-label-caps uppercase text-outline">Local tool — respects robots.txt and each API's rate limits. Check per-item license/attribution before training use.</div>
+    </div>
+  </footer>
+</section>
 
 <script src="/app.js"></script>
 <script>
-  // Purely decorative rotating placeholder — never touches the textarea's
-  // real value, so it can't interfere with app.js's own logic.
+  // Decorative rotating placeholder — never touches the textarea's real
+  // value, so it can't interfere with app.js.
   (function () {
     const textarea = document.getElementById("condition");
     const overlay = document.getElementById("placeholder-overlay");
@@ -422,27 +530,161 @@
       "A table of countries by population from Wikipedia",
     ];
     let promptIndex = 0, charIndex = 0, isDeleting = false;
-
     function tick() {
       if (textarea.value.length > 0) { setTimeout(tick, 400); return; }
       const current = prompts[promptIndex];
       typewriter.textContent = current.substring(0, charIndex);
       let delay = isDeleting ? 25 : 45;
-      if (!isDeleting) {
-        charIndex++;
-        if (charIndex > current.length) { isDeleting = true; delay = 1800; }
-      } else {
-        charIndex--;
-        if (charIndex < 0) { isDeleting = false; charIndex = 0; promptIndex = (promptIndex + 1) % prompts.length; delay = 400; }
-      }
+      if (!isDeleting) { charIndex++; if (charIndex > current.length) { isDeleting = true; delay = 1800; } }
+      else { charIndex--; if (charIndex < 0) { isDeleting = false; charIndex = 0; promptIndex = (promptIndex + 1) % prompts.length; delay = 400; } }
       setTimeout(tick, delay);
     }
     setTimeout(tick, 600);
+    textarea.addEventListener("input", () => { overlay.style.display = textarea.value.length > 0 ? "none" : "block"; });
+  })();
 
-    textarea.addEventListener("input", () => {
-      overlay.style.display = textarea.value.length > 0 ? "none" : "block";
+  // Advanced-filters drawer — smooth height animation (page-only decoration,
+  // independent of app.js). The real select #f-orientation stays in sync
+  // with the pretty radio buttons via a plain change listener.
+  (function () {
+    const toggle = document.getElementById("drawer-toggle");
+    const drawer = document.getElementById("advanced-drawer");
+    const icon = document.getElementById("drawer-icon");
+    let open = false;
+    toggle.addEventListener("click", () => {
+      open = !open;
+      if (open) { drawer.style.maxHeight = drawer.scrollHeight + "px"; drawer.style.opacity = "1"; icon.style.transform = "rotate(180deg)"; }
+      else { drawer.style.maxHeight = "0"; drawer.style.opacity = "0"; icon.style.transform = "rotate(0deg)"; }
+    });
+    document.querySelectorAll('input[name="orientation"]').forEach((radio) => {
+      radio.addEventListener("change", () => {
+        document.getElementById("f-orientation").value = radio.value;
+      });
     });
   })();
+
+  // Linked train/val/test sliders — dragging one rebalances the other two
+  // so they always sum to 100 (app.js just reads the final slider .value
+  // attributes on export, so this is purely presentational).
+  (function () {
+    const trainSlider = document.getElementById("split-train");
+    const valSlider = document.getElementById("split-val");
+    const testSlider = document.getElementById("split-test");
+    const trainVal = document.getElementById("train-val");
+    const valVal = document.getElementById("val-val");
+    const testVal = document.getElementById("test-val");
+    const visTrain = document.getElementById("vis-train");
+    const visVal = document.getElementById("vis-val");
+    const visTest = document.getElementById("vis-test");
+
+    function updateSplits(source) {
+      let t = parseInt(trainSlider.value, 10);
+      let v = parseInt(valSlider.value, 10);
+      let ts = parseInt(testSlider.value, 10);
+      const total = t + v + ts;
+      if (total !== 100) {
+        if (source === "train") { const r = 100 - t; v = Math.floor(r / 2); ts = r - v; }
+        else if (source === "val") { const r = 100 - v; t = Math.floor(r * 0.8); ts = r - t; }
+        else { const r = 100 - ts; t = Math.floor(r * 0.8); v = r - t; }
+      }
+      trainSlider.value = t; valSlider.value = v; testSlider.value = ts;
+      trainVal.textContent = t + "%"; valVal.textContent = v + "%"; testVal.textContent = ts + "%";
+      visTrain.style.width = t + "%"; visVal.style.width = v + "%"; visTest.style.width = ts + "%";
+    }
+    trainSlider.addEventListener("input", () => updateSplits("train"));
+    valSlider.addEventListener("input", () => updateSplits("val"));
+    testSlider.addEventListener("input", () => updateSplits("test"));
+  })();
+
+  // Footer year + export dataset info card (label/count aren't known until
+  // a run exists — filled in from the parsed filters once available).
+  document.getElementById("footer-year").textContent = "© " + new Date().getFullYear() + " Distillery — Liquid Glass";
+  (function () {
+    const labelInput = document.getElementById("f-label");
+    const countInput = document.getElementById("f-count");
+    const typeSelect = document.getElementById("f-data-type");
+    function refresh() {
+      document.getElementById("export-dataset-name").textContent = labelInput.value || "dataset";
+      const grid = document.getElementById("results-grid");
+      document.getElementById("export-dataset-meta").textContent = `${grid.children.length} items • ${typeSelect.value}`;
+      document.getElementById("results-heading-sub").textContent = `Reviewing results for "${document.getElementById("condition").value.trim() || labelInput.value || "your query"}"`;
+    }
+    new MutationObserver(refresh).observe(document.getElementById("results-grid"), { childList: true });
+    labelInput.addEventListener("input", refresh);
+    typeSelect.addEventListener("change", refresh);
+    refresh();
+  })();
+
+  // --- Shared atmospheric background: WebGL noise shader + drifting photo,
+  // scoped to each step's own box (position:absolute) except the results
+  // step, which stays viewport-fixed like Stitch's own screen 4/5. ---
+  function initAtmosphere(containerId) {
+    const root = document.getElementById(containerId);
+    const canvas = root.querySelector("canvas");
+    const img = root.querySelector("img");
+    let angle = Math.random() * 10;
+    function drift() {
+      angle += 0.003;
+      const x = Math.sin(angle) * 12, y = Math.cos(angle * 0.7) * 10;
+      img.style.transform = `translate3d(${x.toFixed(2)}px, ${y.toFixed(2)}px, 0) scale(1.08)`;
+      requestAnimationFrame(drift);
+    }
+    requestAnimationFrame(drift);
+
+    const gl = canvas.getContext("webgl", { alpha: true, antialias: true });
+    if (!gl) return;
+    const vs = `attribute vec2 position; varying vec2 v_uv; void main(){ v_uv = position*0.5+0.5; gl_Position = vec4(position,0.0,1.0); }`;
+    const fs = `
+      precision highp float; varying vec2 v_uv; uniform float u_time;
+      float noise(vec2 p){ return fract(sin(dot(p, vec2(12.9898,78.233))) * 43758.5453); }
+      void main(){
+        vec2 uv = v_uv;
+        vec2 shift = vec2(sin(u_time*0.03)*0.02, cos(u_time*0.025)*0.02);
+        vec2 suv = uv + shift;
+        float t = u_time*0.06;
+        vec3 charcoal = vec3(0.047,0.051,0.063);
+        vec3 indigo = vec3(0.10,0.13,0.22);
+        vec3 blue = vec3(0.07,0.10,0.18);
+        vec3 mintGlow = vec3(0.5,0.9,0.75)*0.08;
+        float n1 = sin(suv.x*1.3+t)*cos(suv.y*0.7+t*0.4);
+        float n2 = sin(suv.y*1.6-t*0.5)*cos(suv.x*1.1+t*0.2);
+        float l1 = smoothstep(0.2,0.8,n1*0.5+0.5);
+        float l2 = smoothstep(0.3,0.9,n2*0.5+0.5);
+        vec3 color = charcoal;
+        color = mix(color, indigo, l1*0.5);
+        color = mix(color, blue, l2*0.4);
+        color += mintGlow*pow(l1*l2, 2.0);
+        color += (noise(uv+u_time*0.005)-0.5)*0.01;
+        gl_FragColor = vec4(color, 1.0);
+      }`;
+    function shader(type, src) { const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s); return s; }
+    const program = gl.createProgram();
+    gl.attachShader(program, shader(gl.VERTEX_SHADER, vs));
+    gl.attachShader(program, shader(gl.FRAGMENT_SHADER, fs));
+    gl.linkProgram(program);
+    const buf = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, -1,1, 1,-1, 1,1]), gl.STATIC_DRAW);
+    const posLoc = gl.getAttribLocation(program, "position");
+    gl.enableVertexAttribArray(posLoc);
+    gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0);
+    const timeLoc = gl.getUniformLocation(program, "u_time");
+    function resize() {
+      const w = canvas.clientWidth, h = canvas.clientHeight;
+      if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+    }
+    function render(time) {
+      time *= 0.001;
+      resize();
+      gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
+      gl.useProgram(program);
+      gl.uniform1f(timeLoc, time);
+      gl.drawArrays(gl.TRIANGLES, 0, 6);
+      requestAnimationFrame(render);
+    }
+    requestAnimationFrame(render);
+  }
+  ["atmo-1", "atmo-2", "atmo-3", "atmo-4"].forEach(initAtmosphere);
 </script>
 </body>
 </html>

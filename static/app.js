@@ -14,6 +14,10 @@
   let targetCount = 0;
   let pollTimer = null;
   let excludedIds = new Set();
+  // Tracks the previously-rendered fetched-count so renderProgress() can
+  // animate the rolling-digit counter only when the value actually changes,
+  // instead of re-rolling on every 1s poll tick.
+  let lastFetchedCount = null;
 
   $("mode-preview").addEventListener("click", () => setMode("preview"));
   $("mode-dataset").addEventListener("click", () => setMode("dataset"));
@@ -29,13 +33,16 @@
     $("mode-dataset").classList.toggle("active", mode === "dataset");
   }
 
+  // Some message boxes (Stitch's amber/mint glass panels) wrap their text in
+  // a nested <p> alongside a decorative icon — target that if present so we
+  // don't blow away the icon by setting textContent on the container itself.
   function showError(el, message) {
-    el.textContent = message;
+    (el.querySelector("p") || el).textContent = message;
     el.classList.remove("hidden", "info");
     el.classList.add("error");
   }
   function showInfo(el, message) {
-    el.textContent = message;
+    (el.querySelector("p") || el).textContent = message;
     el.classList.remove("hidden", "error");
     el.classList.add("info");
   }
@@ -117,6 +124,7 @@
     const structured_query = buildStructuredQuery();
     excludedIds = new Set(); // brand new run — nothing discarded yet
     targetCount = structured_query.count; // fixed for this run's lifetime, including any top-ups
+    lastFetchedCount = null; // don't roll from a previous run's count
     $("fetch-btn").disabled = true;
     hideError($("fetch-error"));
     $("progress-panel").classList.remove("hidden");
@@ -190,8 +198,29 @@
   function renderProgress(run) {
     const pct = run.requested_count > 0 ? Math.min(100, (run.fetched_count / run.requested_count) * 100) : 0;
     $("progress-bar").style.width = pct + "%";
-    $("progress-count").textContent = `${run.fetched_count} / ${run.requested_count}`;
+    $("progress-target").textContent = run.requested_count;
+    animateCounter(run.fetched_count);
     $("progress-label").textContent = `Status: ${run.status}`;
+  }
+
+  // Rolling-digit counter animation (two stacked spans, translated by one
+  // line-height) — only plays when the count actually changed since the
+  // last render, so repeated poll ticks at the same value don't re-roll.
+  function animateCounter(newVal) {
+    const inner = $("counter-inner-current");
+    if (lastFetchedCount === null || lastFetchedCount === newVal) {
+      inner.style.transition = "none";
+      inner.innerHTML = `<span>${newVal}</span><span>${newVal}</span>`;
+      inner.style.transform = "translate3d(0,0,0)";
+    } else {
+      inner.style.transition = "none";
+      inner.innerHTML = `<span>${lastFetchedCount}</span><span>${newVal}</span>`;
+      inner.style.transform = "translate3d(0,0,0)";
+      void inner.offsetWidth; // force reflow so the transition below actually plays
+      inner.style.transition = "transform 0.5s cubic-bezier(0.4,0,0.2,1)";
+      inner.style.transform = "translate3d(0,-1em,0)";
+    }
+    lastFetchedCount = newVal;
   }
 
   async function loadResults() {
@@ -229,13 +258,16 @@
   function updateResultsSummary(total) {
     const kept = total - excludedIds.size;
     const needed = Math.max(0, targetCount - kept);
-    $("results-summary").textContent = excludedIds.size > 0
-      ? `${kept} of ${total} item(s) kept for export (${excludedIds.size} discarded)`
-      : `${total} item(s) fetched`;
+
+    $("kept-count").textContent = `${kept} KEPT`;
+    $("discarded-count").textContent = `${excludedIds.size} DISCARDED`;
+    $("target-count").textContent = `TARGET ${targetCount}`;
+    const pct = targetCount > 0 ? Math.min(100, (kept / targetCount) * 100) : 0;
+    $("mini-progress-fill").style.width = pct + "%";
 
     const topupBtn = $("topup-btn");
     if (needed > 0 && total > 0) {
-      topupBtn.textContent = `Fetch ${needed} more to reach your target of ${targetCount}`;
+      $("topup-label").textContent = `FETCH ${needed} MORE`;
       topupBtn.classList.remove("hidden");
     } else {
       topupBtn.classList.add("hidden");
@@ -250,37 +282,59 @@
     return `/api/files/${itemId}?run_id=${encodeURIComponent(currentRunId)}`;
   }
 
+  // `card` here is the inner .glass-card element (Stitch's markup wraps it
+  // in a .masonry-item for column layout) — discarded styling and the
+  // discard/restore icon+label swap both live on it.
   function setCardDiscarded(card, btn, discarded) {
     card.classList.toggle("discarded", discarded);
-    btn.textContent = discarded ? "↺ Restore" : "✕ Discard";
-    btn.title = discarded ? "Restore this item — include it in the dataset export again" : "Discard this item — it won't be included in the dataset export";
+    btn.innerHTML = discarded
+      ? '<span class="material-symbols-outlined text-[16px]">refresh</span><span class="font-label-caps text-label-caps">RESTORE</span>'
+      : '<span class="material-symbols-outlined text-[16px]">close</span><span class="font-label-caps text-label-caps">DISCARD</span>';
+    btn.title = discarded
+      ? "Restore this item — include it in the dataset export again"
+      : "Discard this item — it won't be included in the dataset export";
   }
 
   function renderCard(item) {
+    const wrap = document.createElement("div");
+    wrap.className = "masonry-item";
+    wrap.dataset.itemId = item.id;
+
     const card = document.createElement("div");
-    card.className = "card";
-    card.dataset.itemId = item.id;
+    card.className = "glass-card rounded-xl overflow-hidden group relative";
+    wrap.appendChild(card);
+
+    const media = document.createElement("div");
+    media.className = "relative overflow-hidden";
+    card.appendChild(media);
+
+    if (item.data_type === "image" && item.local_path) {
+      const img = document.createElement("img");
+      img.className = "w-full h-auto block object-cover transition-transform duration-700 group-hover:scale-105";
+      img.src = fileUrl(item.id);
+      img.loading = "lazy";
+      media.appendChild(img);
+    }
 
     if (item.local_path) {
       const filename = item.local_path.split("/").pop() || `${item.id}.dat`;
       const downloadLink = document.createElement("a");
-      downloadLink.className = "download-btn";
+      downloadLink.className = "absolute top-3 left-3 p-1.5 rounded-full bg-surface/50 backdrop-blur-md border border-white/10 text-on-surface opacity-0 group-hover:opacity-100 transition-opacity hover:bg-surface/80 flex items-center justify-center";
       downloadLink.href = fileUrl(item.id);
       downloadLink.download = filename;
       downloadLink.title = "Download this item";
-      downloadLink.textContent = "⬇";
-      card.appendChild(downloadLink);
+      downloadLink.innerHTML = '<span class="material-symbols-outlined text-[18px]">download</span>';
+      media.appendChild(downloadLink);
     }
 
-    // Always-visible discard control — not just a hint in the summary text,
-    // so a first-time user can see at a glance that every card is
-    // actionable, without having to already know to click it.
+    // Always-visible once discarded (matches Stitch's own "pre-discarded"
+    // card example) — otherwise reveals on hover like the download button.
     const discardBtn = document.createElement("button");
     discardBtn.type = "button";
-    discardBtn.className = "discard-btn";
+    discardBtn.className = "discard-btn absolute top-3 right-3 px-3 py-1.5 rounded-full bg-surface/50 backdrop-blur-md border border-white/10 text-on-surface flex items-center gap-1 transition-opacity hover:bg-error/20 hover:text-error hover:border-error/30";
     setCardDiscarded(card, discardBtn, excludedIds.has(item.id));
     discardBtn.addEventListener("click", () => {
-      const id = card.dataset.itemId;
+      const id = wrap.dataset.itemId;
       const nowDiscarded = !excludedIds.has(id);
       if (nowDiscarded) {
         excludedIds.add(id);
@@ -290,33 +344,39 @@
       setCardDiscarded(card, discardBtn, nowDiscarded);
       updateResultsSummary($("results-grid").children.length);
     });
-    card.appendChild(discardBtn);
+    media.appendChild(discardBtn);
 
-    if (item.data_type === "image" && item.local_path) {
-      const img = document.createElement("img");
-      img.src = fileUrl(item.id);
-      img.loading = "lazy";
-      card.appendChild(img);
-    }
     const body = document.createElement("div");
-    body.className = "body";
-    const title = document.createElement("div");
-    title.className = "title";
-    title.textContent = item.title || item.text_snippet || item.source_url;
-    body.appendChild(title);
-    if (item.data_type !== "image" && item.text_snippet) {
-      const snippet = document.createElement("div");
-      snippet.className = "meta";
-      snippet.textContent = item.text_snippet.slice(0, 140);
-      body.appendChild(snippet);
-    }
-    const meta = document.createElement("div");
-    meta.className = "meta";
-    meta.innerHTML = `<span class="badge">${item.source_name || ""}</span>${item.license || "license unknown"}`;
-    body.appendChild(meta);
+    body.className = "p-4 border-t border-white/5";
     card.appendChild(body);
 
-    return card;
+    const topRow = document.createElement("div");
+    topRow.className = "flex justify-between items-center mb-2 gap-2";
+    body.appendChild(topRow);
+
+    const code = document.createElement("span");
+    code.className = "font-code text-code text-primary";
+    code.textContent = "#" + item.id.slice(0, 8);
+    topRow.appendChild(code);
+
+    const badge = document.createElement("span");
+    badge.className = "font-label-caps text-label-caps text-secondary-fixed bg-secondary-fixed/10 px-2 py-0.5 rounded-full whitespace-nowrap";
+    badge.textContent = (item.source_name || "web").toUpperCase();
+    topRow.appendChild(badge);
+
+    const caption = document.createElement("p");
+    caption.className = "font-body-sm text-body-sm text-on-surface-variant line-clamp-2";
+    caption.textContent = item.title || item.text_snippet || item.source_url;
+    body.appendChild(caption);
+
+    if (item.data_type !== "image" && item.text_snippet) {
+      const snippet = document.createElement("p");
+      snippet.className = "font-body-sm text-body-sm text-outline mt-1 line-clamp-3";
+      snippet.textContent = item.text_snippet.slice(0, 200);
+      body.appendChild(snippet);
+    }
+
+    return wrap;
   }
 
   async function onTopup() {
