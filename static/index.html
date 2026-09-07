@@ -435,27 +435,6 @@
     <div id="results-summary" class="hidden"></div>
     <div class="masonry-grid" id="results-grid"></div>
 
-    <!-- Fixed summary footer (kept / discarded / target + mini progress + top-up) -->
-    <div class="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 w-[calc(100%-32px)] max-w-[620px] flex flex-col sm:flex-row justify-center items-center gap-3">
-      <div class="glass-panel rounded-full px-6 py-3 flex items-center gap-4 flex-wrap justify-center w-full sm:w-auto">
-        <div class="flex items-center gap-2 flex-wrap justify-center">
-          <span id="kept-count" class="text-label-caps text-secondary">0 KEPT</span>
-          <span class="text-outline-variant">·</span>
-          <span id="discarded-count" class="text-label-caps text-outline">0 DISCARDED</span>
-          <span class="text-outline-variant">·</span>
-          <span id="target-count" class="text-label-caps text-primary">TARGET 0</span>
-        </div>
-        <div class="h-4 w-px bg-white/10 hidden sm:block"></div>
-        <div class="w-24 h-1.5 bg-surface-container-high rounded-full overflow-hidden">
-          <div class="h-full bg-primary" id="mini-progress-fill" style="width:0%"></div>
-        </div>
-      </div>
-      <button type="button" id="topup-btn" class="glass-button rounded-full px-6 py-3 text-label-caps text-primary flex items-center gap-2 whitespace-nowrap shadow-[0_0_15px_rgba(173,198,255,0.1)] hidden">
-        <span class="material-symbols-outlined text-[18px]">add_circle</span>
-        <span id="topup-label"></span>
-      </button>
-    </div>
-
     <!-- Export builder -->
     <div id="export-section" class="glass-panel rounded-xl p-padding-panel mt-stack-lg flex flex-col gap-stack-lg hidden">
       <h2 class="text-headline-lg font-semibold text-primary text-center md:text-left">Dataset builder</h2>
@@ -528,6 +507,33 @@
   </div>
 </section>
 </div><!-- #swipe-track -->
+
+<!-- Fixed summary footer (kept / discarded / target + mini progress + top-up).
+     Deliberately OUTSIDE #swipe-track: position:fixed inside an ancestor
+     that has a CSS transform (the swipe track's translate3d) anchors to
+     that ancestor's own box instead of the real viewport — it would sit at
+     one fixed spot along the whole 4-slide-wide track rather than tracking
+     whichever step is actually on screen. Shown/hidden by the swipe
+     controller below based on which step is current. -->
+<div class="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 w-[calc(100%-32px)] max-w-[620px] flex flex-col sm:flex-row justify-center items-center gap-3 hidden" id="results-footer">
+  <div class="glass-panel rounded-full px-6 py-3 flex items-center gap-4 flex-wrap justify-center w-full sm:w-auto">
+    <div class="flex items-center gap-2 flex-wrap justify-center">
+      <span id="kept-count" class="text-label-caps text-secondary">0 KEPT</span>
+      <span class="text-outline-variant">·</span>
+      <span id="discarded-count" class="text-label-caps text-outline">0 DISCARDED</span>
+      <span class="text-outline-variant">·</span>
+      <span id="target-count" class="text-label-caps text-primary">TARGET 0</span>
+    </div>
+    <div class="h-4 w-px bg-white/10 hidden sm:block"></div>
+    <div class="w-24 h-1.5 bg-surface-container-high rounded-full overflow-hidden">
+      <div class="h-full bg-primary" id="mini-progress-fill" style="width:0%"></div>
+    </div>
+  </div>
+  <button type="button" id="topup-btn" class="glass-button rounded-full px-6 py-3 text-label-caps text-primary flex items-center gap-2 whitespace-nowrap shadow-[0_0_15px_rgba(173,198,255,0.1)] hidden">
+    <span class="material-symbols-outlined text-[18px]">add_circle</span>
+    <span id="topup-label"></span>
+  </button>
+</div>
 
 <script src="/app.js"></script>
 <script>
@@ -615,11 +621,14 @@
   // results-panel), instead of the page just scrolling down to it.
   (function () {
     const track = document.getElementById("swipe-track");
+    const resultsFooter = document.getElementById("results-footer");
     const order = ["step-condition", "filters-panel", "progress-panel", "results-panel"];
+    const RESULTS_INDEX = order.indexOf("results-panel");
     let current = 0;
     function goTo(index) {
       current = index;
       track.style.transform = `translate3d(-${index * 100}vw, 0, 0)`;
+      resultsFooter.classList.toggle("hidden", index !== RESULTS_INDEX);
     }
     order.forEach((id, index) => {
       if (index === 0) return; // step 1 is visible from the start
