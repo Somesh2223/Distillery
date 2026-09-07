@@ -260,4 +260,18 @@ def download_run(run_id: str):
     return FileResponse(path, filename=f"{run_id}_dataset.zip", media_type="application/zip")
 
 
-app.mount("/", StaticFiles(directory=str(BASE_DIR / "static"), html=True), name="static")
+class NoCacheStaticFiles(StaticFiles):
+    """Plain StaticFiles caches aggressively enough that browsers will keep
+    serving a stale index.html/app.js after an edit even on a hard reload —
+    confusing during active local development, and easy to mistake for
+    uvicorn --reload not picking up changes when it's actually the browser's
+    disk cache. This is a local dev tool, not a CDN-fronted production app,
+    so always-fresh static files are worth more than caching them."""
+
+    def file_response(self, *args, **kwargs):
+        response = super().file_response(*args, **kwargs)
+        response.headers["Cache-Control"] = "no-store"
+        return response
+
+
+app.mount("/", NoCacheStaticFiles(directory=str(BASE_DIR / "static"), html=True), name="static")
