@@ -70,16 +70,16 @@
   .step-content { position: relative; z-index: 10; min-height: 100vh; box-sizing: border-box; }
 
   .glass-panel {
-    background: rgba(17, 19, 23, 0.5);
-    backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+    background: rgba(17, 19, 23, 0.22);
+    backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
     border: 1px solid transparent;
-    background-image: linear-gradient(rgba(17,19,23,0.5), rgba(17,19,23,0.5)), linear-gradient(135deg, rgba(255,255,255,0.2) 0%, rgba(255,255,255,0.05) 100%);
+    background-image: linear-gradient(rgba(17,19,23,0.22), rgba(17,19,23,0.22)), linear-gradient(135deg, rgba(255,255,255,0.2) 0%, rgba(255,255,255,0.05) 100%);
     background-origin: border-box; background-clip: padding-box, border-box;
     box-shadow: inset 0 1px 0 0 rgba(255,255,255,0.1), 0 4px 24px -8px rgba(0,0,0,0.5);
   }
 
   .glass-input {
-    background: rgba(255,255,255,0.06); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+    background: rgba(255,255,255,0.035); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
     border: 1px solid rgba(255,255,255,0.12); color: #e2e2e8;
     transition: border-color 0.3s ease, box-shadow 0.3s ease, background 0.3s ease;
   }
@@ -185,7 +185,7 @@
 <!-- STEP 1 — Condition input                                     -->
 <!-- ============================================================ -->
 <section class="step" id="step-condition">
-  <div class="step-atmosphere" id="atmo-1"><canvas></canvas><img alt="" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAlfEm24YHgG9Pe9mXxDnoZommWjp5BCB0f7Wq7m1raXvV8iQEIlo4W8rTckiPt6kIfQAoQehS9C3hmD8N0UfSRnIWaEZHEFedypEM0A_Rw350Nki9R1DZB9FgB-ckoxE935BBmByiEVXP773aJnBs1dF8fAKpuKVBCmNJHdcb812InJGSaffQ1WPaCh6o_TbKse69cX2kSR8Xy7fqZjGgY3d9Ie_C_zLoOYKwoUxKd9Xyc-tybug93SQ=s1920"></div>
+  <div class="step-atmosphere" id="atmo-1"><canvas></canvas><img alt="" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDavaSIZJgH3J5Wupg5NmsDODH5zA161YmaRpjYWi9yiL6wFaSDUtse_u5WirBvA7hyXSehDDwDYWN_FWT5qbrDmuLRssKZoq6vkR5gHJ7PlHROngMsjBmd59RNvVfCwgoeUUgf3ihNIc-mVei_emz6hI-NIiXoQ4sPsm7WFnHlCJSrP7lIcPs0oZigItc9Rf60LRgOZ-pZ9INvwrKm4ErVkn4Vd6IjhCciFIIJkA8aCsM49wkayJ7Ntg=s1920"></div>
   <main class="step-content w-full max-w-max-width mx-auto px-gutter py-margin-page flex flex-col items-center">
     <div class="mb-stack-lg fade-up text-center flex items-center gap-3 justify-center">
       <img src="/logo.svg" alt="" class="w-10 h-10 md:w-12 md:h-12">
@@ -364,7 +364,7 @@
 <!-- STEP 3 — Live fetch                                          -->
 <!-- ============================================================ -->
 <section class="step hidden" id="progress-panel">
-  <div class="step-atmosphere" id="atmo-3"><canvas></canvas><img alt="" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBgIlDPyUmsg37BHpjfvRu1tu4HhZLx5HVKC1XoNS7F6zQQc6d7Apt4Ks9FP6Wa4X3ZwFzqP1wbCCd4pLORwV_d3QmqBNGLUTlY79c_YPNvyJR1euOhZgSsBaLTf7mHEE7XSZ71XrY-ME-LhjpUX1_yol8QxsoOAdqPB4eC5nNUGzD-osVqGdDZcz4t_sDZXAAF1oy5bXRRxRfYZJfMHM8lnxK7LytbzIwjyF8j2QWeqvY_cGXOO4Ls0g=s1920"></div>
+  <div class="step-atmosphere" id="atmo-3"><canvas></canvas><img alt="" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDavaSIZJgH3J5Wupg5NmsDODH5zA161YmaRpjYWi9yiL6wFaSDUtse_u5WirBvA7hyXSehDDwDYWN_FWT5qbrDmuLRssKZoq6vkR5gHJ7PlHROngMsjBmd59RNvVfCwgoeUUgf3ihNIc-mVei_emz6hI-NIiXoQ4sPsm7WFnHlCJSrP7lIcPs0oZigItc9Rf60LRgOZ-pZ9INvwrKm4ErVkn4Vd6IjhCciFIIJkA8aCsM49wkayJ7Ntg=s1920"></div>
   <main class="step-content w-full max-w-max-width mx-auto px-gutter py-margin-page flex flex-col items-center">
     <div class="glass-panel w-full max-w-md rounded-2xl p-padding-panel flex flex-col gap-stack-lg shadow-2xl fade-up">
       <div class="flex flex-col items-center text-center gap-stack-sm mb-2">
@@ -407,7 +407,7 @@
 <!-- STEP 4 — Results gallery + export builder                    -->
 <!-- ============================================================ -->
 <section class="step hidden" id="results-panel">
-  <div class="step-atmosphere" id="atmo-4"><canvas></canvas><img alt="" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDHhun4k_DfkMH7985ZG42WK1k-M2VMHlIdifPMkBNJI3bg5dotHWu3re0HZyUoPDTfNMYjquYbFuMtnh_KhnoGs6AepV7edAFaOY37wriuq5Twb2xi9n7GbbVNwYbeHqSAOhYmwao5zXDoLU_XjNp1NHW0wysc0tKMhQSUTpd8dIJjndJMxOjSYEyjmljz597yrAVIe4Qxeu8paV0k2cmVYhYdQCXo1Zw_lUDEinkUvW5QmaYzzZhTTA=s1920"></div>
+  <div class="step-atmosphere" id="atmo-4"><canvas></canvas><img alt="" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDavaSIZJgH3J5Wupg5NmsDODH5zA161YmaRpjYWi9yiL6wFaSDUtse_u5WirBvA7hyXSehDDwDYWN_FWT5qbrDmuLRssKZoq6vkR5gHJ7PlHROngMsjBmd59RNvVfCwgoeUUgf3ihNIc-mVei_emz6hI-NIiXoQ4sPsm7WFnHlCJSrP7lIcPs0oZigItc9Rf60LRgOZ-pZ9INvwrKm4ErVkn4Vd6IjhCciFIIJkA8aCsM49wkayJ7Ntg=s1920"></div>
 
   <div class="step-content">
   <nav class="sticky top-0 z-30 bg-surface/30 backdrop-blur-md border-b border-white/10">
@@ -652,14 +652,22 @@
   // --- Shared atmospheric background: WebGL noise shader + drifting photo,
   // scoped to each step's own box (position:absolute) except the results
   // step, which stays viewport-fixed like Stitch's own screen 4/5. ---
-  function initAtmosphere(containerId) {
+  function initAtmosphere(containerId, stepIndex) {
     const root = document.getElementById(containerId);
     const canvas = root.querySelector("canvas");
     const img = root.querySelector("img");
-    let angle = Math.random() * 10;
-    function drift() {
-      angle += 0.003;
-      const x = Math.sin(angle) * 12, y = Math.cos(angle * 0.7) * 10;
+    // All 4 steps share the same background photo, and this base offset
+    // shifts it a little further per step (in the same direction the swipe
+    // track slides) — the goal is for advancing a step to read as panning
+    // across one continuous scene rather than cutting to an unrelated
+    // photo. requestAnimationFrame's timestamp is a shared clock across all
+    // four canvases, so the ambient drift on top of that stays in phase
+    // between steps instead of drifting independently.
+    const baseX = (stepIndex - 1.5) * 22;
+    function drift(time) {
+      const t = time * 0.00015;
+      const x = baseX + Math.sin(t) * 10;
+      const y = Math.cos(t * 0.7) * 8;
       img.style.transform = `translate3d(${x.toFixed(2)}px, ${y.toFixed(2)}px, 0) scale(1.08)`;
       requestAnimationFrame(drift);
     }
@@ -718,7 +726,7 @@
     }
     requestAnimationFrame(render);
   }
-  ["atmo-1", "atmo-2", "atmo-3", "atmo-4"].forEach(initAtmosphere);
+  ["atmo-1", "atmo-2", "atmo-3", "atmo-4"].forEach((id, i) => initAtmosphere(id, i));
 </script>
 </body>
 </html>
