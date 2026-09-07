@@ -66,7 +66,18 @@
   .step-atmosphere { position: sticky; top: 0; height: 100vh; margin-bottom: -100vh; overflow: hidden; pointer-events: none; z-index: 0; }
   .step-atmosphere canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
   .step-atmosphere img { position: absolute; inset: -5%; width: 110%; height: 110%; object-fit: cover; opacity: 0.55; will-change: transform; transform: translate3d(0,0,0) scale(1.05); transition: transform 0.6s cubic-bezier(0.16,1,0.3,1); }
-  .step-atmosphere::after { content: ""; position: absolute; inset: 0; background: linear-gradient(to bottom, rgba(17,19,23,0.1), rgba(17,19,23,0.55)); }
+  /* Each step's photo is different, so fade both side edges into the same
+     dark haze color the page background uses — at the moment the swipe
+     crosses from one step to the next, both photos are inside their own
+     fade zone and the seam reads as one image dissolving into a shared
+     haze and the next one emerging from it, rather than two unrelated
+     photos butting up against each other. */
+  .step-atmosphere::after {
+    content: ""; position: absolute; inset: 0;
+    background:
+      linear-gradient(to right, #111317 0%, transparent 22%, transparent 78%, #111317 100%),
+      linear-gradient(to bottom, rgba(17,19,23,0.1), rgba(17,19,23,0.55));
+  }
   .step-content { position: relative; z-index: 10; min-height: 100vh; box-sizing: border-box; }
 
   .glass-panel {
@@ -364,7 +375,7 @@
 <!-- STEP 3 — Live fetch                                          -->
 <!-- ============================================================ -->
 <section class="step hidden" id="progress-panel">
-  <div class="step-atmosphere" id="atmo-3"><canvas></canvas><img alt="" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDavaSIZJgH3J5Wupg5NmsDODH5zA161YmaRpjYWi9yiL6wFaSDUtse_u5WirBvA7hyXSehDDwDYWN_FWT5qbrDmuLRssKZoq6vkR5gHJ7PlHROngMsjBmd59RNvVfCwgoeUUgf3ihNIc-mVei_emz6hI-NIiXoQ4sPsm7WFnHlCJSrP7lIcPs0oZigItc9Rf60LRgOZ-pZ9INvwrKm4ErVkn4Vd6IjhCciFIIJkA8aCsM49wkayJ7Ntg=s1920"></div>
+  <div class="step-atmosphere" id="atmo-3"><canvas></canvas><img alt="" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBgIlDPyUmsg37BHpjfvRu1tu4HhZLx5HVKC1XoNS7F6zQQc6d7Apt4Ks9FP6Wa4X3ZwFzqP1wbCCd4pLORwV_d3QmqBNGLUTlY79c_YPNvyJR1euOhZgSsBaLTf7mHEE7XSZ71XrY-ME-LhjpUX1_yol8QxsoOAdqPB4eC5nNUGzD-osVqGdDZcz4t_sDZXAAF1oy5bXRRxRfYZJfMHM8lnxK7LytbzIwjyF8j2QWeqvY_cGXOO4Ls0g=s1920"></div>
   <main class="step-content w-full max-w-max-width mx-auto px-gutter py-margin-page flex flex-col items-center">
     <div class="glass-panel w-full max-w-md rounded-2xl p-padding-panel flex flex-col gap-stack-lg shadow-2xl fade-up">
       <div class="flex flex-col items-center text-center gap-stack-sm mb-2">
@@ -407,7 +418,7 @@
 <!-- STEP 4 — Results gallery + export builder                    -->
 <!-- ============================================================ -->
 <section class="step hidden" id="results-panel">
-  <div class="step-atmosphere" id="atmo-4"><canvas></canvas><img alt="" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDavaSIZJgH3J5Wupg5NmsDODH5zA161YmaRpjYWi9yiL6wFaSDUtse_u5WirBvA7hyXSehDDwDYWN_FWT5qbrDmuLRssKZoq6vkR5gHJ7PlHROngMsjBmd59RNvVfCwgoeUUgf3ihNIc-mVei_emz6hI-NIiXoQ4sPsm7WFnHlCJSrP7lIcPs0oZigItc9Rf60LRgOZ-pZ9INvwrKm4ErVkn4Vd6IjhCciFIIJkA8aCsM49wkayJ7Ntg=s1920"></div>
+  <div class="step-atmosphere" id="atmo-4"><canvas></canvas><img alt="" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDHhun4k_DfkMH7985ZG42WK1k-M2VMHlIdifPMkBNJI3bg5dotHWu3re0HZyUoPDTfNMYjquYbFuMtnh_KhnoGs6AepV7edAFaOY37wriuq5Twb2xi9n7GbbVNwYbeHqSAOhYmwao5zXDoLU_XjNp1NHW0wysc0tKMhQSUTpd8dIJjndJMxOjSYEyjmljz597yrAVIe4Qxeu8paV0k2cmVYhYdQCXo1Zw_lUDEinkUvW5QmaYzzZhTTA=s1920"></div>
 
   <div class="step-content">
   <nav class="sticky top-0 z-30 bg-surface/30 backdrop-blur-md border-b border-white/10">
