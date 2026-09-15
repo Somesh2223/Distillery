@@ -238,6 +238,37 @@ row's JSON stored in `local_path`, later merged into `metadata.csv/json` on
 export). No dataset split is very meaningful for a single ranked table, but
 the same 80/10/10 mechanism still applies if you choose dataset mode.
 
+## Deploying (Railway)
+
+This app is a single process with a local SQLite index and locally-stored
+fetched files/dataset zips — it needs a host that gives it a real persistent
+disk and keeps one long-running process, not a serverless/edge platform.
+[Railway](https://railway.app) fits that with almost no code changes:
+
+1. Push this repo to GitHub (already done if you're reading this from the
+   repo).
+2. On [railway.app](https://railway.app), **New Project → Deploy from GitHub
+   repo**, and pick this repo. Railway auto-detects Python via Nixpacks and
+   uses the start command from `railway.json`/`Procfile`
+   (`uvicorn app:app --host 0.0.0.0 --port $PORT`) — no changes needed there.
+3. **Add a volume** (service → Settings → Volumes) so the SQLite index and
+   fetched files survive redeploys — without one, Railway's filesystem is
+   ephemeral. Mount it at `/data`, then set the environment variable
+   `DATA_DIR=/data` (see step 4) so the app writes there instead of a
+   non-persistent path inside the build.
+4. **Set environment variables** (service → Variables): copy the keys you
+   have from your local `.env` — everything is optional except that without
+   at least one image/text connector key configured, fetches will have
+   nothing to pull from. Add `DATA_DIR=/data` here too, matching the volume
+   mount path from step 3.
+5. Deploy. Railway gives you a public `*.up.railway.app` URL (Settings →
+   Networking → Generate Domain if it doesn't show one automatically). A
+   custom domain can be attached from the same screen.
+
+Nothing in the app itself needs to change to move host later — `HOST`/`PORT`
+are already read from the environment (see `.env.example`), and everything
+under `data/` is git-ignored regardless of where it's mounted.
+
 ## Notes / limitations
 
 - Without `GOOGLE_CSE_API_KEY`/`GOOGLE_CSE_CX` and without a `domain_allowlist`
