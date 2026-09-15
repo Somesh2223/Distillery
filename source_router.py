@@ -73,14 +73,18 @@ def route(
     materialized: list[Item] = []
     connector_errors: list[ConnectorUnavailableError] = []
     # Per-run dedup is the default (each run stands alone, unaffected by
-    # earlier ones) — see QueryFilters.dedupe_across_runs. Cross-run dedup is
-    # opt-in: only then do we pre-load everything ever fetched before.
+    # earlier runs) — see QueryFilters.dedupe_across_runs. Cross-run dedup is
+    # opt-in: only then do we also pre-load everything ever fetched in any
+    # run. Either way, THIS run's own already-fetched items are always
+    # pre-loaded — route() gets called fresh for a top-up against an
+    # existing run, and without this it has no memory of what that run
+    # already has, so the connector's candidate pool can re-offer the same
+    # photos it already fetched earlier in this same run.
+    existing_phashes = [p for _id, p in storage.get_existing_phashes_for_run(run_id)]
+    existing_text_sigs = [dedup.decode_signature(h) for _id, h in storage.get_existing_text_hashes_for_run(run_id)]
     if query.filters.dedupe_across_runs:
-        existing_phashes = [p for _id, p in storage.get_existing_phashes()]
-        existing_text_sigs = [dedup.decode_signature(h) for _id, h in storage.get_existing_text_hashes()]
-    else:
-        existing_phashes = []
-        existing_text_sigs = []
+        existing_phashes += [p for _id, p in storage.get_existing_phashes()]
+        existing_text_sigs += [dedup.decode_signature(h) for _id, h in storage.get_existing_text_hashes()]
 
     def _cancelled() -> bool:
         return cancel_event is not None and cancel_event.is_set()
@@ -269,6 +273,15 @@ def _guess_extension(url: str, content_type: str) -> str:
 def _materialize_and_dedup(
     item: Item, run_id: str, existing_phashes: list[str], existing_text_sigs: list[list[int]], lock: threading.Lock
 ) -> bool:
+    # A candidate re-offering something this run already has (same
+    # deterministic id from its source URL — common on a top-up, since the
+    # connector's ranking for a similar query is stable) must be skipped
+    # BEFORE downloading anything: the download path is id-based, so
+    # writing it would silently overwrite the already-fetched file, and any
+    # subsequent rejection (duplicate/failed-insert) cleanup would then
+    # delete that shared path — destroying the original, already-kept item.
+    if storage.item_exists_for_run(run_id, item.id):
+        return False
     try:
         if item.data_type == "image":
             return _materialize_image(item, run_id, existing_phashes, lock)
@@ -317,10 +330,18 @@ def _materialize_image(item: Item, run_id: str, existing_phashes: list[str], loc
     item.phash = phash
     item.fetched_at = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
     if not storage.insert_item(run_id, item):
+        # insert_item only ever returns False because this exact (id, run_id)
+        # is already stored — e.g. a top-up call re-offering a photo this run
+        # already fetched, since it's the same deterministic id derived from
+        # the source URL. abs_path is that same item's file (filename is
+        # id-based), so it's still referenced by the pre-existing row —
+        # deleting it here would destroy an already-successfully-fetched
+        # file while leaving that row's local_path dangling. Just leave the
+        # (harmlessly re-written, identical) file alone and don't double
+        # count it as a fresh fetch.
         with lock:
             if phash in existing_phashes:
                 existing_phashes.remove(phash)
-        abs_path.unlink(missing_ok=True)
         return False
     return True
 
@@ -350,6 +371,9 @@ def _materialize_textlike(item: Item, run_id: str, existing_text_sigs: list[list
     item.text_hash = dedup.encode_signature(sig)
     item.fetched_at = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
     if not storage.insert_item(run_id, item):
+        # See the matching comment in _materialize_image — this means the
+        # item is already stored for this run, not a real failure, and
+        # abs_path is that same (already-referenced) file.
         with lock:
             if sig in existing_text_sigs:
                 existing_text_sigs.remove(sig)
