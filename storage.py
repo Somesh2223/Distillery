@@ -207,6 +207,17 @@ def get_run(run_id: str) -> Optional[dict]:
 
 # --- items ---
 
+def item_exists_for_run(run_id: str, item_id: str) -> bool:
+    """Cheap existence check used to skip re-downloading a candidate before
+    touching the filesystem at all — see the comment on insert_item and the
+    call site in source_router._materialize_and_dedup for why re-downloading
+    (which overwrites the id-based filename) is unsafe once an item with
+    this id is already stored for this run."""
+    with cursor() as cur:
+        cur.execute("SELECT 1 FROM items WHERE id = ? AND run_id = ?", (item_id, run_id))
+        return cur.fetchone() is not None
+
+
 def insert_item(run_id: str, item: Item) -> bool:
     """Returns False if this exact item id already exists within this same
     run (a defensive check against double-inserting one item; shouldn't
@@ -242,6 +253,24 @@ def get_existing_phashes() -> list[tuple[str, str]]:
 def get_existing_text_hashes() -> list[tuple[str, str]]:
     with cursor() as cur:
         cur.execute("SELECT id, text_hash FROM items WHERE text_hash IS NOT NULL")
+        return [(r["id"], r["text_hash"]) for r in cur.fetchall()]
+
+
+def get_existing_phashes_for_run(run_id: str) -> list[tuple[str, str]]:
+    """Scoped to one run — used so a top-up call (a fresh route() invocation
+    against an existing run) still knows what that run already fetched, even
+    when cross-run dedup is off. Without this, a top-up's candidate pool can
+    re-offer photos the run already has (same deterministic id from the
+    source URL), which insert_item correctly refuses to re-insert — but that
+    used to also delete the original file, since it shares that item's path."""
+    with cursor() as cur:
+        cur.execute("SELECT id, phash FROM items WHERE run_id = ? AND phash IS NOT NULL", (run_id,))
+        return [(r["id"], r["phash"]) for r in cur.fetchall()]
+
+
+def get_existing_text_hashes_for_run(run_id: str) -> list[tuple[str, str]]:
+    with cursor() as cur:
+        cur.execute("SELECT id, text_hash FROM items WHERE run_id = ? AND text_hash IS NOT NULL", (run_id,))
         return [(r["id"], r["text_hash"]) for r in cur.fetchall()]
 
 
