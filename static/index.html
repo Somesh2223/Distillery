@@ -156,8 +156,8 @@
   @keyframes shimmerSweep { 100% { left: 200%; } }
   .rolling-number-container { height: 1em; overflow: hidden; display: inline-block; vertical-align: top; }
   .rolling-number-inner { display: flex; flex-direction: column; will-change: transform; }
-  #parse-error.error, #fetch-error.error { background: rgba(255,180,171,0.1); border: 1px solid rgba(255,180,171,0.3); color: #ffb4ab; }
-  #parse-error.info, #fetch-error.info { background: rgba(78,222,163,0.1); border: 1px solid rgba(78,222,163,0.3); color: #4edea3; }
+  #parse-error.error, #fetch-error.error, #topup-error.error { background: rgba(255,180,171,0.1); border: 1px solid rgba(255,180,171,0.3); color: #ffb4ab; }
+  #parse-error.info, #fetch-error.info, #topup-error.info { background: rgba(78,222,163,0.1); border: 1px solid rgba(78,222,163,0.3); color: #4edea3; }
 
   ::-webkit-scrollbar { width: 6px; }
   ::-webkit-scrollbar-track { background: transparent; }
@@ -444,6 +444,10 @@
     </header>
 
     <div id="results-summary" class="hidden"></div>
+    <div id="topup-error" class="rounded-lg p-4 mb-stack-md flex items-start gap-4 hidden">
+      <span class="material-symbols-outlined text-[20px] mt-0.5">warning</span>
+      <p class="text-body-sm flex-1 leading-relaxed"></p>
+    </div>
     <div class="masonry-grid" id="results-grid"></div>
 
     <!-- Export builder -->
@@ -554,7 +558,8 @@
     </div>
   </div>
   <button type="button" id="topup-btn" class="glass-button rounded-full px-6 py-3 text-label-caps text-primary flex items-center gap-2 whitespace-nowrap shadow-[0_0_15px_rgba(173,198,255,0.1)] hidden">
-    <span class="material-symbols-outlined text-[18px]">add_circle</span>
+    <span class="material-symbols-outlined text-[18px]" id="topup-icon">add_circle</span>
+    <span class="material-symbols-outlined text-[18px] animate-spin hidden" id="topup-spinner">progress_activity</span>
     <span id="topup-label"></span>
   </button>
 </div>
