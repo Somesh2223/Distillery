@@ -271,6 +271,9 @@
     $("mini-progress-fill").style.width = pct + "%";
 
     const topupBtn = $("topup-btn");
+    topupBtn.disabled = false;
+    $("topup-icon").classList.remove("hidden");
+    $("topup-spinner").classList.add("hidden");
     if (needed > 0 && total > 0) {
       $("topup-label").textContent = `FETCH ${needed} MORE`;
       topupBtn.classList.remove("hidden");
@@ -384,6 +387,13 @@
     return wrap;
   }
 
+  // Top-up stays on the results step the whole time — no swiping over to the
+  // progress panel. It reuses that panel's polling logic but never touches
+  // #progress-panel/#results-panel visibility, since toggling those while
+  // already on the results step used to knock #results-panel out of
+  // #swipe-track's flex flow (its "hidden" class is display:none) and leave
+  // the screen blank until the fetch finished. A spinner on the button and
+  // #topup-error for messages replace that instead.
   async function onTopup() {
     if (!currentRunId) return;
     const topupBtn = $("topup-btn");
@@ -392,13 +402,10 @@
     if (needed <= 0) return;
 
     topupBtn.disabled = true;
-    hideError($("fetch-error"));
-    $("progress-panel").classList.remove("hidden");
-    $("progress-label").textContent = "Starting top-up fetch...";
-    const stopBtn = $("stop-btn");
-    stopBtn.classList.remove("hidden");
-    stopBtn.disabled = false;
-    stopBtn.textContent = "Stop fetch";
+    $("topup-icon").classList.add("hidden");
+    $("topup-spinner").classList.remove("hidden");
+    $("topup-label").textContent = "Fetching more...";
+    hideError($("topup-error"));
     try {
       const resp = await fetch(`/api/runs/${currentRunId}/topup`, {
         method: "POST",
@@ -406,12 +413,35 @@
         body: JSON.stringify({ count: needed }),
       });
       if (!resp.ok) throw new Error(await resp.text());
-      pollStatus();
+      pollTopupStatus();
     } catch (err) {
-      showError($("fetch-error"), "Failed to start top-up fetch: " + err.message);
-    } finally {
-      topupBtn.disabled = false;
+      showError($("topup-error"), "Failed to start top-up fetch: " + err.message);
+      updateResultsSummary($("results-grid").children.length);
     }
+  }
+
+  function pollTopupStatus() {
+    if (pollTimer) clearInterval(pollTimer);
+    pollTimer = setInterval(async () => {
+      try {
+        const resp = await fetch(`/api/runs/${currentRunId}/status`);
+        if (!resp.ok) throw new Error(await resp.text());
+        const run = await resp.json();
+        if (run.status === "completed" || run.status === "failed" || run.status === "cancelled") {
+          clearInterval(pollTimer);
+          if (run.status === "failed") {
+            showError($("topup-error"), "Top-up fetch failed: " + (run.error || "unknown error"));
+            updateResultsSummary($("results-grid").children.length);
+          } else {
+            await loadResults();
+          }
+        }
+      } catch (err) {
+        clearInterval(pollTimer);
+        showError($("topup-error"), "Lost connection while polling top-up status: " + err.message);
+        updateResultsSummary($("results-grid").children.length);
+      }
+    }, 1000);
   }
 
   async function onExport() {
