@@ -54,7 +54,7 @@
   /* --- Swipe-slide track: each step is a full 100vw/100vh slide, and
      moving to the next one slides the whole track left instead of the
      page just scrolling down past a stack of panels. --- */
-  #swipe-track { display: flex; height: 100vh; width: 100%; transition: transform 0.85s cubic-bezier(0.22, 1, 0.36, 1); will-change: transform; transform: translate3d(0,0,0); backface-visibility: hidden; }
+  #swipe-track { display: flex; height: 100vh; width: 100%; transition: transform 0.85s cubic-bezier(0.22, 1, 0.36, 1); transform: translateX(0); }
   @media (prefers-reduced-motion: reduce) { #swipe-track { transition: none; } }
   .step { flex: 0 0 100vw; width: 100vw; height: 100vh; overflow-y: auto; overflow-x: hidden; position: relative; -webkit-overflow-scrolling: touch; will-change: transform; contain: layout style paint; }
 
@@ -519,6 +519,19 @@
 </section>
 </div><!-- #swipe-track -->
 
+<!-- Slide back/forward controls. Also OUTSIDE #swipe-track for the same
+     reason as the results footer below — position:fixed inside a
+     transformed ancestor tracks that ancestor's box, not the real
+     viewport. Bounded by the swipe controller JS to whichever steps have
+     actually been unlocked so far (can't jump ahead to a step with no
+     content yet). -->
+<button type="button" id="nav-prev" class="fixed left-4 top-1/2 -translate-y-1/2 z-50 glass-button rounded-full w-12 h-12 flex items-center justify-center hidden" aria-label="Previous step">
+  <span class="material-symbols-outlined">chevron_left</span>
+</button>
+<button type="button" id="nav-next" class="fixed right-4 top-1/2 -translate-y-1/2 z-50 glass-button rounded-full w-12 h-12 flex items-center justify-center hidden" aria-label="Next step">
+  <span class="material-symbols-outlined">chevron_right</span>
+</button>
+
 <!-- Fixed summary footer (kept / discarded / target + mini progress + top-up).
      Deliberately OUTSIDE #swipe-track: position:fixed inside an ancestor
      that has a CSS transform (the swipe track's translate3d) anchors to
@@ -629,25 +642,53 @@
 
   // Swipe-slide controller — advances the track to the next step whenever
   // app.js reveals it (removes "hidden" from filters-panel/progress-panel/
-  // results-panel), instead of the page just scrolling down to it.
+  // results-panel), instead of the page just scrolling down to it. Also
+  // exposes manual back/forward nav, bounded to steps already unlocked
+  // (maxReached) so you can't jump ahead to a step with no content yet.
   (function () {
     const track = document.getElementById("swipe-track");
     const resultsFooter = document.getElementById("results-footer");
+    const prevBtn = document.getElementById("nav-prev");
+    const nextBtn = document.getElementById("nav-next");
     const order = ["step-condition", "filters-panel", "progress-panel", "results-panel"];
     const RESULTS_INDEX = order.indexOf("results-panel");
     let current = 0;
-    function goTo(index) {
-      current = index;
-      track.style.transform = `translate3d(-${index * 100}vw, 0, 0)`;
-      resultsFooter.classList.toggle("hidden", index !== RESULTS_INDEX);
+    let maxReached = 0;
+
+    function updateNavButtons() {
+      prevBtn.classList.toggle("hidden", current === 0);
+      nextBtn.classList.toggle("hidden", current >= maxReached);
     }
+
+    function goTo(index) {
+      if (index < 0 || index > maxReached) return;
+      current = index;
+      track.style.transform = `translateX(-${index * 100}vw)`;
+      resultsFooter.classList.toggle("hidden", index !== RESULTS_INDEX);
+      updateNavButtons();
+    }
+
     order.forEach((id, index) => {
       if (index === 0) return; // step 1 is visible from the start
       const el = document.getElementById(id);
       new MutationObserver(() => {
-        if (!el.classList.contains("hidden") && current < index) goTo(index);
+        if (!el.classList.contains("hidden") && maxReached < index) {
+          maxReached = index;
+          goTo(index); // auto-advance the first time a new step unlocks
+        }
       }).observe(el, { attributes: true, attributeFilter: ["class"] });
     });
+
+    prevBtn.addEventListener("click", () => goTo(current - 1));
+    nextBtn.addEventListener("click", () => goTo(current + 1));
+    document.addEventListener("keydown", (e) => {
+      const tag = (e.target.tagName || "").toLowerCase();
+      if (tag === "input" || tag === "textarea" || tag === "select") return;
+      if (e.key === "ArrowLeft") goTo(current - 1);
+      else if (e.key === "ArrowRight") goTo(current + 1);
+    });
+
+    updateNavButtons();
   })();
 
   // Footer year + export dataset info card (label/count aren't known until
