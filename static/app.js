@@ -373,6 +373,7 @@
       visitLink.rel = "noopener noreferrer";
       visitLink.title = "Open the original source in a new tab";
       visitLink.innerHTML = '<span class="material-symbols-outlined text-[18px]">open_in_new</span>';
+      visitLink.addEventListener("click", (event) => event.stopPropagation());
       media.appendChild(visitLink);
     }
 
@@ -384,6 +385,7 @@
       downloadLink.download = filename;
       downloadLink.title = "Download this item";
       downloadLink.innerHTML = '<span class="material-symbols-outlined text-[18px]">download</span>';
+      downloadLink.addEventListener("click", (event) => event.stopPropagation());
       media.appendChild(downloadLink);
     }
 
@@ -393,7 +395,13 @@
     discardBtn.type = "button";
     discardBtn.className = "discard-btn absolute top-3 right-3 px-3 py-1.5 rounded-full bg-surface/50 backdrop-blur-md border border-white/10 text-on-surface flex items-center gap-1 transition-opacity hover:bg-error/20 hover:text-error hover:border-error/30";
     setCardDiscarded(card, discardBtn, excludedIds.has(item.id));
-    discardBtn.addEventListener("click", () => {
+    discardBtn.addEventListener("click", (event) => {
+      // Must stop here rather than leaving it to the card's own handler to
+      // recognise this click: setCardDiscarded below rewrites this button's
+      // innerHTML, so by the time the event reaches the card the clicked
+      // icon/label span has been detached and can no longer be traced back
+      // to the button it came from.
+      event.stopPropagation();
       const id = wrap.dataset.itemId;
       const nowDiscarded = !excludedIds.has(id);
       if (nowDiscarded) {
