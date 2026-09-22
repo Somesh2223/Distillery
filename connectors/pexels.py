@@ -81,7 +81,14 @@ class PexelsConnector(BaseConnector):
                         attribution=f"Photo by {photo.get('photographer', 'unknown')} on Pexels",
                         author=photo.get("photographer"),
                         query_text=query.search_terms(),
-                        extra={"pexels_id": photo.get("id"), "photographer_url": photo.get("photographer_url")},
+                        # page_url: source_url is the raw CDN image file we
+                        # download, not something a human wants to open —
+                        # the UI's "view source" link uses this instead.
+                        extra={
+                            "pexels_id": photo.get("id"),
+                            "photographer_url": photo.get("photographer_url"),
+                            "page_url": photo.get("url"),
+                        },
                     )
                 )
             if not data.get("next_page"):

@@ -86,7 +86,7 @@ class PixabayConnector(BaseConnector):
                         attribution=f"Image by {hit.get('user', 'unknown')} on Pixabay",
                         author=hit.get("user"),
                         query_text=query.search_terms(),
-                        extra={"pixabay_id": hit.get("id")},
+                        extra={"pixabay_id": hit.get("id"), "page_url": hit.get("pageURL")},
                     )
                 )
             if page * per_page >= data.get("totalHits", 0):

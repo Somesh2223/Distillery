@@ -87,7 +87,11 @@ class UnsplashConnector(BaseConnector):
                         author=user.get("name"),
                         published_at=photo.get("created_at"),
                         query_text=query.search_terms(),
-                        extra={"unsplash_id": photo.get("id"), "links": photo.get("links", {})},
+                        extra={
+                            "unsplash_id": photo.get("id"),
+                            "links": photo.get("links", {}),
+                            "page_url": (photo.get("links") or {}).get("html"),
+                        },
                     )
                 )
             if page * per_page >= data.get("total", 0):

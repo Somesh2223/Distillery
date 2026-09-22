@@ -274,12 +274,11 @@
     topupBtn.disabled = false;
     $("topup-icon").classList.remove("hidden");
     $("topup-spinner").classList.add("hidden");
-    if (needed > 0 && total > 0) {
-      $("topup-label").textContent = `FETCH ${needed} MORE`;
-      topupBtn.classList.remove("hidden");
-    } else {
-      topupBtn.classList.add("hidden");
-    }
+    // Label is reset unconditionally — leaving it inside the branch below
+    // left a hidden button still reading "Fetching more..." from the last
+    // top-up.
+    $("topup-label").textContent = `FETCH ${needed} MORE`;
+    topupBtn.classList.toggle("hidden", !(needed > 0 && total > 0));
   }
 
   function fileUrl(itemId) {
@@ -288,6 +287,22 @@
     // default now), so without this the server could serve an unrelated
     // run's file, including one that's since been cleaned up.
     return `/api/files/${itemId}?run_id=${encodeURIComponent(currentRunId)}`;
+  }
+
+  // Image connectors download from a raw CDN file URL, so source_url isn't a
+  // page anyone wants to open — they record the real one as extra.page_url.
+  // Text/structured connectors fetch the page itself, so source_url is
+  // already right. The scheme check keeps a connector value from ever
+  // becoming a javascript: href.
+  function sourcePageUrl(item) {
+    let extra = {};
+    try {
+      extra = JSON.parse(item.extra_json || "{}") || {};
+    } catch (err) {
+      extra = {};
+    }
+    const url = extra.page_url || item.source_url || "";
+    return /^https?:\/\//i.test(url) ? url : "";
   }
 
   // `card` here is the inner .glass-card element (Stitch's markup wraps it
@@ -322,12 +337,38 @@
       img.src = fileUrl(item.id);
       img.loading = "lazy";
       media.appendChild(img);
+    } else {
+      // Text and structured items have no thumbnail, but every action button
+      // below is positioned against this box. Left empty it collapsed to
+      // zero height and its own overflow-hidden clipped the discard and
+      // download buttons out of existence, so those cards had no controls
+      // at all — hence a visible banner rather than an empty div.
+      media.className = "relative overflow-hidden h-20 flex items-end px-4 pb-3 bg-gradient-to-br from-primary/15 via-surface-container-high/30 to-transparent";
+      const kind = document.createElement("span");
+      kind.className = "font-label-caps text-label-caps text-primary/80 flex items-center gap-1.5";
+      const isTable = item.data_type === "structured";
+      kind.innerHTML =
+        `<span class="material-symbols-outlined text-[18px]">${isTable ? "table_chart" : "article"}</span>` +
+        (isTable ? "TABLE ROW" : "ARTICLE");
+      media.appendChild(kind);
+    }
+
+    const pageUrl = sourcePageUrl(item);
+    if (pageUrl) {
+      const visitLink = document.createElement("a");
+      visitLink.className = "absolute top-3 left-3 p-1.5 rounded-full bg-surface/50 backdrop-blur-md border border-white/10 text-on-surface opacity-0 group-hover:opacity-100 transition-opacity hover:bg-surface/80 flex items-center justify-center";
+      visitLink.href = pageUrl;
+      visitLink.target = "_blank";
+      visitLink.rel = "noopener noreferrer";
+      visitLink.title = "Open the original source in a new tab";
+      visitLink.innerHTML = '<span class="material-symbols-outlined text-[18px]">open_in_new</span>';
+      media.appendChild(visitLink);
     }
 
     if (item.local_path) {
       const filename = item.local_path.split("/").pop() || `${item.id}.dat`;
       const downloadLink = document.createElement("a");
-      downloadLink.className = "absolute top-3 left-3 p-1.5 rounded-full bg-surface/50 backdrop-blur-md border border-white/10 text-on-surface opacity-0 group-hover:opacity-100 transition-opacity hover:bg-surface/80 flex items-center justify-center";
+      downloadLink.className = "absolute top-3 left-12 p-1.5 rounded-full bg-surface/50 backdrop-blur-md border border-white/10 text-on-surface opacity-0 group-hover:opacity-100 transition-opacity hover:bg-surface/80 flex items-center justify-center";
       downloadLink.href = fileUrl(item.id);
       downloadLink.download = filename;
       downloadLink.title = "Download this item";
