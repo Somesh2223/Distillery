@@ -355,6 +355,17 @@
 
     const pageUrl = sourcePageUrl(item);
     if (pageUrl) {
+      // The whole card opens the source — a small hover-revealed icon was
+      // the only way in, which isn't discoverable and doesn't exist at all
+      // on touch. The guard lets the discard/download controls keep their
+      // own clicks.
+      card.classList.add("cursor-pointer");
+      card.title = "Open the original source in a new tab";
+      card.addEventListener("click", (event) => {
+        if (event.target.closest("button, a")) return;
+        window.open(pageUrl, "_blank", "noopener,noreferrer");
+      });
+
       const visitLink = document.createElement("a");
       visitLink.className = "absolute top-3 left-3 p-1.5 rounded-full bg-surface/50 backdrop-blur-md border border-white/10 text-on-surface opacity-0 group-hover:opacity-100 transition-opacity hover:bg-surface/80 flex items-center justify-center";
       visitLink.href = pageUrl;
