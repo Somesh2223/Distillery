@@ -13,7 +13,8 @@ from __future__ import annotations
 
 import json
 import re
-from typing import Any
+from datetime import date, timedelta
+from typing import Any, Optional
 
 from config import ANTHROPIC_API_KEY, ANTHROPIC_MODEL, GEMINI_API_KEY, GEMINI_MODEL
 from logging_setup import get_logger, log_event
@@ -67,7 +68,10 @@ _TOOL_SCHEMA = {
     },
 }
 
-_SYSTEM_PROMPT = (
+_SYSTEM_PROMPT_TEMPLATE = (
+    "Today's date is {today}. Resolve every relative time expression (\"the last 6 months\", "
+    "\"recent\", \"since last year\") against that date, not against your training data — a "
+    "date_range anchored to the wrong year silently filters out every matching result. "
     "You convert a user's natural-language data request into a structured query for a data-fetching "
     "tool. Infer sensible defaults when the user doesn't specify something explicitly: default count "
     "is 20 if not stated (cap at 1000), default output_mode is 'preview' unless the user clearly wants "
@@ -80,6 +84,12 @@ _SYSTEM_PROMPT = (
     "real, relevant photos far more often. Only include sign/warning/icon imagery in the keywords if the "
     "user explicitly asked for that. Always call the emit_structured_query tool exactly once."
 )
+
+
+def _system_prompt() -> str:
+    # Built per call, not once at import: a long-running server would otherwise
+    # keep telling the model it's still whatever day the process started on.
+    return _SYSTEM_PROMPT_TEMPLATE.format(today=date.today().isoformat())
 
 
 def parse_condition(condition: str) -> StructuredQuery:
@@ -109,7 +119,7 @@ def _parse_with_llm(condition: str) -> StructuredQuery:
     response = client.messages.create(
         model=ANTHROPIC_MODEL,
         max_tokens=1024,
-        system=_SYSTEM_PROMPT,
+        system=_system_prompt(),
         tools=[_TOOL_SCHEMA],
         tool_choice={"type": "tool", "name": "emit_structured_query"},
         messages=[{"role": "user", "content": condition}],
@@ -168,7 +178,7 @@ def _parse_with_gemini(condition: str) -> StructuredQuery:
         model=GEMINI_MODEL,
         contents=condition,
         config=types.GenerateContentConfig(
-            system_instruction=_SYSTEM_PROMPT,
+            system_instruction=_system_prompt(),
             response_mime_type="application/json",
             response_schema=_GEMINI_RESPONSE_SCHEMA,
         ),
@@ -181,9 +191,8 @@ def _parse_with_gemini(condition: str) -> StructuredQuery:
     return query
 
 
-_COUNT_RE = re.compile(r"\b(\d{1,4})\b")
 _IMAGE_WORDS = {"photo", "photos", "image", "images", "picture", "pictures", "pic", "pics"}
-_TEXT_WORDS = {"article", "articles", "news", "post", "posts", "story", "stories"}
+_TEXT_WORDS = {"article", "articles", "news", "post", "posts", "story", "stories", "blog", "blogs"}
 _STRUCTURED_WORDS = {"table", "tables", "list", "listing", "ranking", "rankings", "prices", "dataset of"}
 _DATASET_WORDS = {"dataset", "training", "train", "ml", "model", "labeled", "label"}
 _STOPWORDS = {
@@ -203,6 +212,7 @@ _STOPWORDS = {
     "it", "its", "not", "if", "whether", "so", "then", "just", "some", "any",
     "each", "every", "using", "used", "use", "about", "by", "few", "several",
     "many", "most", "more", "less", "without", "watermark", "watermarks",
+    "taken", "ago", "between", "during", "within", "over", "under",
 }
 # Category-indicator words are useful for detecting data_type/output_mode but
 # don't describe the subject — stripped from the keywords sent to connectors
@@ -211,9 +221,67 @@ _NON_DESCRIPTIVE_WORDS = _IMAGE_WORDS | _TEXT_WORDS | _DATASET_WORDS | {
     w for w in _STRUCTURED_WORDS if " " not in w
 }
 
+# --- time expressions ---
+# Pulled out of the condition before anything else looks at it. Their digits
+# would otherwise be read as the requested item count ("the last 6 months" ->
+# fetch 6 items, "since 2020" -> fetch 1000) and their words would end up in
+# the search keywords, where they match nothing.
+_UNIT_DAYS = {"day": 1, "week": 7, "month": 30, "year": 365}
+_RELATIVE_PERIOD_RE = re.compile(
+    r"\b(?:in|from|over|within|during)?\s*(?:the\s+)?(?:last|past|previous)\s+(?:(\d{1,3})\s+)?(day|week|month|year)s?\b"
+)
+_SINCE_YEAR_RE = re.compile(r"\b(?:since|after)\s+((?:19|20)\d{2})\b")
+
+# A bare number is only a count when a countable noun follows it fairly
+# closely ("500 wet road surface photos"). This is what keeps model numbers
+# and years in the subject ("Boeing 747", "the 2008 financial crisis") from
+# being swallowed as counts.
+_COUNTABLE_NOUNS = sorted(
+    _IMAGE_WORDS | _TEXT_WORDS | {
+        "table", "tables", "listing", "listings", "ranking", "rankings",
+        "item", "items", "result", "results", "sample", "samples",
+        "example", "examples", "row", "rows", "entry", "entries",
+    },
+    key=len,
+    reverse=True,
+)
+_COUNT_RE = re.compile(
+    r"\b(\d{1,4})\s+(?:[a-z][\w'-]*\s+){0,4}?(?:" + "|".join(_COUNTABLE_NOUNS) + r")\b"
+)
+_LEADING_COUNT_RE = re.compile(r"^\s*(\d{1,4})\b")
+
+
+def _extract_date_range(text: str) -> tuple[Optional[dict], str]:
+    """Returns (date_range, text with the time expression removed).
+
+    Month and year lengths are approximated in days. This is the no-LLM
+    fallback path, where being a couple of days off on a range boundary
+    matters far less than not mangling the count and keywords.
+    """
+    today = date.today()
+
+    m = _RELATIVE_PERIOD_RE.search(text)
+    if m:
+        n = int(m.group(1)) if m.group(1) else 1
+        start = today - timedelta(days=n * _UNIT_DAYS[m.group(2)])
+        return (
+            {"from": start.isoformat(), "to": today.isoformat()},
+            text[:m.start()] + " " + text[m.end():],
+        )
+
+    m = _SINCE_YEAR_RE.search(text)
+    if m:
+        return (
+            {"from": f"{m.group(1)}-01-01", "to": today.isoformat()},
+            text[:m.start()] + " " + text[m.end():],
+        )
+
+    return None, text
+
 
 def _heuristic_parse(condition: str, fallback_reason: str | None = None) -> StructuredQuery:
     lower = condition.lower()
+    date_range, cleaned = _extract_date_range(lower)
 
     data_type = "text"
     if any(w in lower for w in _IMAGE_WORDS):
@@ -223,19 +291,30 @@ def _heuristic_parse(condition: str, fallback_reason: str | None = None) -> Stru
     elif any(w in lower for w in _TEXT_WORDS):
         data_type = "text"
 
-    count_match = _COUNT_RE.search(condition)
+    count_match = _COUNT_RE.search(cleaned) or _LEADING_COUNT_RE.search(cleaned)
     count = int(count_match.group(1)) if count_match else 20
     count = max(1, min(count, 1000))
+    # Only the digits actually read as the count are dropped from the
+    # keywords — other numbers are usually part of the subject itself
+    # ("Boeing 747", "2008 financial crisis") and searching without them
+    # finds the wrong thing.
+    count_token = count_match.group(1) if count_match else None
 
-    words = [w.strip(",.?!") for w in lower.split()]
+    words = [w.strip(",.?!").lstrip("-+") for w in cleaned.split()]
     keywords = [
         w for w in words
-        if w and w not in _STOPWORDS and w not in _NON_DESCRIPTIVE_WORDS and not w.isdigit() and not w.isnumeric()
+        if w and w not in _STOPWORDS and w not in _NON_DESCRIPTIVE_WORDS and w != count_token
     ]
+    if not keywords:
+        # The condition names no subject at all ("articles from last month").
+        # Keep the category words rather than falling back to the raw
+        # sentence — that would put the time expression we just stripped
+        # back into the search string as one long unmatchable phrase.
+        keywords = [w for w in words if w and w not in _STOPWORDS and w != count_token]
     # A generous cap, not a truncation to the first few words — after the
     # filler-word filtering above, what's left is almost always the actual
     # subject, so we shouldn't cut it off arbitrarily.
-    keywords = keywords[:15] if keywords else [condition.strip()]
+    keywords = keywords[:15]
 
     no_watermark = "no watermark" in lower or "without watermark" in lower
     orientation = None
@@ -257,6 +336,7 @@ def _heuristic_parse(condition: str, fallback_reason: str | None = None) -> Stru
             "resolution": resolution,
             "orientation": orientation,
             "no_watermark": no_watermark,
+            "date_range": date_range,
             "domain_allowlist": [],
         },
         output_mode=output_mode,  # type: ignore[arg-type]
