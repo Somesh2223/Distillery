@@ -96,6 +96,10 @@ def route(
             progress_cb(total_so_far, existing_count + target)
 
     state_lock = threading.Lock()
+    # Slots claimed by in-flight or completed materializations. Tracked
+    # separately from len(materialized) so the cap can be enforced before a
+    # worker starts downloading and inserting, rather than after.
+    claimed = 0
 
     def _consume(raw_items: list[Item]) -> None:
         """Materializes a batch concurrently — this is the dominant cost
@@ -105,20 +109,48 @@ def route(
         if not raw_items:
             return
 
-        def _worker(item: Item) -> None:
-            if _cancelled():
-                return
-            with state_lock:
-                if len(materialized) >= target:
-                    return
-            if _materialize_and_dedup(item, run_id, existing_phashes, existing_text_sigs, state_lock):
-                with state_lock:
-                    if len(materialized) < target:
-                        materialized.append(item)
-                        _notify()
+        # Workers pull from a shared cursor rather than being pinned one-to-one
+        # to a candidate. A slot has to be claimed BEFORE materializing, since
+        # _materialize_and_dedup inserts the row as part of its work — capping
+        # afterwards would only cap this in-memory list, while every worker
+        # that got past the check had already committed a row (the UI reads
+        # the DB, not this list), so a top-up of 1 could land 8 rows. But a
+        # claimed slot is released again when the candidate turns out to be a
+        # duplicate or fails to download, and only a worker that can still
+        # reach the next candidate can take that freed slot — hence the shared
+        # cursor instead of one task per item, which would leave the freed slot
+        # unclaimable and quietly under-deliver.
+        cursor = iter(raw_items)
+        cursor_lock = threading.Lock()
 
-        with concurrent.futures.ThreadPoolExecutor(max_workers=MATERIALIZE_WORKERS) as executor:
-            futures = [executor.submit(_worker, item) for item in raw_items]
+        def _runner() -> None:
+            nonlocal claimed
+            while not _cancelled():
+                with state_lock:
+                    if claimed >= target:
+                        return
+                with cursor_lock:
+                    item = next(cursor, None)
+                if item is None:
+                    return
+                with state_lock:
+                    if claimed >= target:
+                        return
+                    claimed += 1
+                kept = False
+                try:
+                    kept = _materialize_and_dedup(item, run_id, existing_phashes, existing_text_sigs, state_lock)
+                finally:
+                    with state_lock:
+                        if kept:
+                            materialized.append(item)
+                            _notify()
+                        else:
+                            claimed -= 1
+
+        worker_count = max(1, min(MATERIALIZE_WORKERS, len(raw_items)))
+        with concurrent.futures.ThreadPoolExecutor(max_workers=worker_count) as executor:
+            futures = [executor.submit(_runner) for _ in range(worker_count)]
             for fut in concurrent.futures.as_completed(futures):
                 fut.result()
 
